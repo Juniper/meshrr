@@ -1,0 +1,251 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  creationTimestamp: null
+  name: meshrr-mirkwood
+  selfLink: /api/v1/namespaces/default/services/meshrr-mirkwood
+spec:
+  clusterIP: None
+  ports:
+  - name: bgp
+    port: 179
+    protocol: TCP
+    targetPort: bgp
+  selector:
+    app: meshrr
+    meshrr_region_mirkwood: "true"
+  sessionAffinity: None
+  type: ClusterIP
+status:
+  loadBalancer: {}
+
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: meshrr-mirkwood-a
+  labels:
+    app: meshrr
+    meshrr_region_mirkwood: "true"
+    redundancy_group: a
+spec:
+  selector:
+    matchLabels:
+      app: meshrr
+  minReadySeconds: 5
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+  template:
+    metadata:
+      labels:
+        app: meshrr
+        meshrr_region_mirkwood: "true"
+        redundancy_group: a
+    spec:
+      dnsPolicy: ClusterFirst
+      terminationGracePeriodSeconds: 30
+      volumes:
+        - name: crpd-license
+          secret:
+            secretName: crpd-license
+            items:
+              - key: junos_sfnt.lic
+                path: junos_sfnt.lic
+        - configMap:
+            defaultMode: 256
+            items:
+            - key: config
+              mode: 256
+              path: juniper.conf.j2
+            name: mirkwood-config
+            optional: false
+          name: config
+      containers:
+        - name: meshrr-mirkwood-a
+          image: <registryURL>/meshrr:latest
+          imagePullPolicy: Always
+          livenessProbe:
+            failureThreshold: 3
+            initialDelaySeconds: 15
+            periodSeconds: 2
+            successThreshold: 1
+            tcpSocket:
+              port: bgp
+            timeoutSeconds: 3
+          readinessProbe:
+            failureThreshold: 3
+            initialDelaySeconds: 5
+            periodSeconds: 2
+            successThreshold: 2
+            tcpSocket:
+              port: bgp
+            timeoutSeconds: 3
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          ports:
+            - name: bgp
+              containerPort: 179
+              protocol: TCP
+              hostIP: 172.19.2.1
+              hostPort: 179
+          env:
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: AUTONOMOUS_SYSTEM
+              value: '65000'
+            - name: ENCRYPTED_ROOT_PW
+              value: >-
+                $6$4XN/d$QdZrrRZNL2MtGXqKuZ/mr1S5tH46eyBKTKeWGVugxfqCGjKKqH2LhP8yNoqfYwVNvc0xsd0JSl6s9epsSPB7M1
+            - name: MESH_SERVICE_NAME
+              value: meshrr-mirkwood
+            - name: UPSTREAM_SERVICE_NAME
+              value: meshrr-core
+            - name: MESHRR_CLIENTRANGE
+              value: 172.18.0.0/16
+          volumeMounts:
+            - name: crpd-license
+              mountPath: /config/license/safenet/
+              subPath: ''
+            - mountPath: /root/juniper.conf.j2
+              name: config
+              readOnly: true
+              subPath: juniper.conf.j2
+          securityContext:
+            allowPrivilegeEscalation: true
+            privileged: true
+            runAsNonRoot: false
+      imagePullSecrets:
+        - name: regcred
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: redundancy_group
+                    operator: In
+                    values:
+                      - a
+                  - key: meshrr_region_mirkwood
+                    operator: In
+                    values:
+                      - "true"
+
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: meshrr-mirkwood-b
+  labels:
+    app: meshrr
+    meshrr_region_mirkwood: "true"
+    redundancy_group: b
+spec:
+  selector:
+    matchLabels:
+      app: meshrr
+  minReadySeconds: 5
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+  template:
+    metadata:
+      labels:
+        app: meshrr
+        meshrr_region_mirkwood: "true"
+        redundancy_group: b
+    spec:
+      dnsPolicy: ClusterFirst
+      terminationGracePeriodSeconds: 30
+      volumes:
+        - name: crpd-license
+          secret:
+            secretName: crpd-license
+            items:
+              - key: junos_sfnt.lic
+                path: junos_sfnt.lic
+        - configMap:
+            defaultMode: 256
+            items:
+            - key: config
+              mode: 256
+              path: juniper.conf.j2
+            name: mirkwood-config
+            optional: false
+          name: config
+      containers:
+        - name: meshrr-mirkwood-b
+          image: <registryURL>/meshrr:latest
+          imagePullPolicy: Always
+          livenessProbe:
+            failureThreshold: 3
+            initialDelaySeconds: 15
+            periodSeconds: 2
+            successThreshold: 1
+            tcpSocket:
+              port: bgp
+            timeoutSeconds: 3
+          readinessProbe:
+            failureThreshold: 3
+            initialDelaySeconds: 5
+            periodSeconds: 2
+            successThreshold: 2
+            tcpSocket:
+              port: bgp
+            timeoutSeconds: 3
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          ports:
+            - name: bgp
+              containerPort: 179
+              protocol: TCP
+              hostIP: 172.19.2.2
+              hostPort: 179
+          env:
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: AUTONOMOUS_SYSTEM
+              value: '65000'
+            - name: ENCRYPTED_ROOT_PW
+              value: >-
+                $6$4XN/d$QdZrrRZNL2MtGXqKuZ/mr1S5tH46eyBKTKeWGVugxfqCGjKKqH2LhP8yNoqfYwVNvc0xsd0JSl6s9epsSPB7M1
+            - name: MESH_SERVICE_NAME
+              value: meshrr-mirkwood
+            - name: UPSTREAM_SERVICE_NAME
+              value: meshrr-core
+            - name: MESHRR_CLIENTRANGE
+              value: 172.18.0.0/16
+          volumeMounts:
+            - name: crpd-license
+              mountPath: /config/license/safenet/
+              subPath: ''
+            - mountPath: /root/juniper.conf.j2
+              name: config
+              readOnly: true
+              subPath: juniper.conf.j2
+          securityContext:
+            allowPrivilegeEscalation: true
+            privileged: true
+            runAsNonRoot: false
+      imagePullSecrets:
+        - name: regcred
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: redundancy_group
+                    operator: In
+                    values:
+                      - b
+                  - key: meshrr_region_mirkwood
+                    operator: In
+                    values:
+                      - "true"

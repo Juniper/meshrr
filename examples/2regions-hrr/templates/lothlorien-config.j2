@@ -1,0 +1,66 @@
+system {
+    root-authentication {
+        encrypted-password "{{ ENCRYPTED_ROOT_PW }}"; ## SECRET-DATA
+    }
+    processes {
+        routing {
+            bgp {
+                rib-sharding;
+                update-threading;
+            }
+        }
+    }
+}
+groups {
+    MESHRR {
+        protocols {
+            bgp {
+                group MESHRR-MESH {
+                    type internal
+                }
+                group MESHRR-CLIENTS {
+                    type internal;
+                    cluster {{ POD_IP }};
+                    allow {{ MESHRR_CLIENTRANGE }};
+                }{% if UPSTREAM_SERVICE_NAME is not none %}
+                group MESHRR-UPSTREAM {
+                    type internal;
+                }{% endif %}
+            }
+        }
+    }
+}
+policy-options {
+    policy-statement UPSTREAM-OUT {
+        term DROP-INREGION-ONLY {
+            from community INREGION-ONLY;
+            then reject;
+        }
+        term INREGION-PREFERRED {
+            from community INREGION-PREFERRED;
+            then {
+                local-preference 20;
+            }
+        }
+        then accept;
+    }
+    community INREGION-ONLY members 65000:101;
+    community INREGION-PREFERRED members 65000:102;
+}
+routing-options {
+    autonomous-system {{ AUTONOMOUS_SYSTEM }};
+    router-id {{ POD_IP }};
+}
+protocols {
+    bgp {
+        apply-groups MESHRR;
+        family inet {
+            unicast {
+                nexthop-resolution {
+                    no-resolution;
+                }
+                no-install;
+            }
+        }
+    }
+}

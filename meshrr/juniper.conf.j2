@@ -1,0 +1,49 @@
+system {
+    root-authentication {
+        encrypted-password "{{ ENCRYPTED_ROOT_PW }}"; ## SECRET-DATA
+    }
+    processes {
+        routing {
+            bgp {
+                rib-sharding;
+                update-threading;
+            }
+        }
+    }
+}
+routing-options {
+    autonomous-system {{ AUTONOMOUS_SYSTEM }};
+    router-id {{ POD_IP }};
+}
+groups {
+    MESHRR {
+        protocols {
+            bgp {
+                group MESHRR-MESH {
+                    type internal
+                }
+                group MESHRR-CLIENTS {
+                    type internal;
+                    cluster {{ POD_IP }};
+                    allow {{ MESHRR_CLIENTRANGE }};
+                }{% if UPSTREAM_SERVICE_NAME is not none %}
+                group MESHRR-UPSTREAM {
+                    type internal;
+                }{% endif %}
+            }
+        }
+    }
+}
+protocols {
+    bgp {
+        apply-groups MESHRR;
+        family inet {
+            unicast {
+                nexthop-resolution {
+                    no-resolution;
+                }
+                no-install;
+            }
+        }
+    }
+}

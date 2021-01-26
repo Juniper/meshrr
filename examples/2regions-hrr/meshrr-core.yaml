@@ -1,0 +1,141 @@
+﻿---
+apiVersion: v1
+kind: Service
+metadata:
+  creationTimestamp: null
+  name: meshrr-core
+  selfLink: /api/v1/namespaces/default/services/meshrr-core
+spec:
+  clusterIP: None
+  ports:
+  - name: bgp
+    port: 179
+    protocol: TCP
+    targetPort: bgp
+  selector:
+    app: meshrr
+    meshrr_region_core: "true"
+  sessionAffinity: None
+  type: ClusterIP
+status:
+  loadBalancer: {}
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: meshrr-core
+  labels:
+    app: meshrr
+    meshrr_region_core: "true"
+spec:
+  selector:
+    matchLabels:
+      app: meshrr
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        app: meshrr
+        meshrr_region_core: "true"
+    spec:
+      dnsPolicy: ClusterFirst
+      terminationGracePeriodSeconds: 30
+      volumes:
+        - name: crpd-license
+          secret:
+            secretName: crpd-license
+            items:
+              - key: junos_sfnt.lic
+                path: junos_sfnt.lic
+      containers:
+        - name: meshrr-core
+          image: <registryURL>/meshrr:latest
+          imagePullPolicy: Always
+          livenessProbe:
+            failureThreshold: 3
+            initialDelaySeconds: 15
+            periodSeconds: 2
+            successThreshold: 1
+            tcpSocket:
+              port: bgp
+            timeoutSeconds: 3
+          readinessProbe:
+            failureThreshold: 3
+            initialDelaySeconds: 5
+            periodSeconds: 2
+            successThreshold: 2
+            tcpSocket:
+              port: bgp
+            timeoutSeconds: 3
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          ports:
+            - name: bgp
+              containerPort: 179
+              protocol: TCP
+          env:
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: AUTONOMOUS_SYSTEM
+              value: '65000'
+            - name: ENCRYPTED_ROOT_PW
+              value: >-
+                $6$4XN/d$QdZrrRZNL2MtGXqKuZ/mr1S5tH46eyBKTKeWGVugxfqCGjKKqH2LhP8yNoqfYwVNvc0xsd0JSl6s9epsSPB7M1
+            - name: MESH_SERVICE_NAME
+              value: meshrr-core
+            - name: MESHRR_CLIENTRANGE
+              value: 0/0
+          volumeMounts:
+            - name: crpd-license
+              mountPath: /config/license/safenet/
+              subPath: ''
+          securityContext:
+            allowPrivilegeEscalation: true
+            privileged: true
+            runAsNonRoot: false
+      imagePullSecrets:
+        - name: regcred
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: meshrr_region_core
+                    operator: In
+                    values:
+                      - "true"
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: meshrr_region_core
+                    operator: In
+                    values:
+                      - 'true'
+                  - key: app
+                    operator: In
+                    values:
+                      - meshrr
+              topologyKey: kubernetes.io/hostname
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 50
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - meshrr
+                    - key: meshrr_region_core
+                      operator: In
+                      values:
+                        - 'true'
+                topologyKey: redundancy_group
