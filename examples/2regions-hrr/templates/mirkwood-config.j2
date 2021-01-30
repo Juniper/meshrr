@@ -25,6 +25,7 @@ groups {
                 }{% if UPSTREAM_SERVICE_NAME is not none %}
                 group MESHRR-UPSTREAM {
                     type internal;
+                    export UPSTREAM-OUT;
                 }{% endif %}
             }
         }
