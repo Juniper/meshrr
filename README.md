@@ -22,6 +22,20 @@ At this time and in the project's raw form, *meshrr* should not be considered fo
 ### Prerequisites
 1. An operational Kubernetes cluster with sufficient resources for the topology you wish to build.
 2. A *private* container registry accessible to your Kubernetes cluster.
+   - You'll need to be logged in to your registry using `docker login` to push the image you'll build.
+   - You'll need to store your registry credentials in a secret in your cluster to pull from this registry. In this project, all examples use a secret named `regcred`. There are a few ways you can do this.
+     1. If you already have a simple means of generating the secret manifest (e.g. using `doctl`), you can do this in one line:
+        ```
+        doctl registry kubernetes-manifest --name regcred | kubectl apply -f -
+        ```
+     2. You can generate the secret manually with all the parameters:
+        ```
+        kubectl create secret docker-registry regcred \
+          --docker-server=<server> --docker-username=<username> \
+          --docker-password=<password> --docker-email=<email>
+        ```
+     3. Any number of [other reasonable approaches](https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/).
+
 3. A cRPD license for the number of nodes you wish to deploy. At the time of writing, Juniper offers [free trial licenses](https://www.juniper.net/us/en/dm/crpd-trial/). Standard licenses are limited to 16 BGP peers and 4M RIB entries.
 
 ### Quickstart
@@ -46,7 +60,10 @@ At this time and in the project's raw form, *meshrr* should not be considered fo
       1.  Service
       2.  Labels (if following the 2regions-hrr example, your regions probably are not in Middle Earth)
     2. [Environment Variables](#Environment-Variables)
-    3. Licensing mechanism. Examples here currently use a secret mounted as a volume mapped to `/config/license/safenet/junos_sfnt.lic`. This may be appropriate for bundle licenses.
+    3. Licensing mechanism. Examples here currently use a secret mounted as a volume mapped to `/config/license/safenet/junos_sfnt.lic`. This may be appropriate for bundle licenses where it is appropriate to use the same license file for many similar devices in a deployment or daemonset. You can create this using:
+      ```
+      kubectl create secret generic crpd-license --from-file=junos_sfnt.lic=<filepath>
+      ```
     4. Custom configuration Jinja2 templates loaded into ConfigMaps and mapped as volumes. See [Examples](#Examples).
     5. Port mapping IP addresses (`hostIP`). No `hostIP` must be specified for instances only accessible within the cluster. Detailed strategy information to be defined in [Examples](#Examples).
 5.  Apply appropriate labels to the nodes:
