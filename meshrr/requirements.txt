@@ -3,7 +3,7 @@ cffi==1.14.4
 cryptography==3.3.2
 dnspython==2.0.0
 importlib-resources==3.3.0
-Jinja2==2.11.2
+Jinja2==2.11.3
 junos-eznc==2.5.4
 lxml==4.6.1
 MarkupSafe==1.1.1
