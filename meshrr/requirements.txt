@@ -9,7 +9,7 @@ lxml==4.6.5
 MarkupSafe==1.1.1
 ncclient==0.6.9
 netaddr==0.8.0
-paramiko==2.7.2
+paramiko==2.10.1
 pip==21.1
 pycparser==2.20
 PyNaCl==1.4.0
