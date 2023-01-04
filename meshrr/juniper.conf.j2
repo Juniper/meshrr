@@ -17,33 +17,63 @@ routing-options {
 }
 groups {
     MESHRR {
-        protocols {
+        {% if MESHRR_MODE == 'routeserver' %}policy-options {
+            as-list MESHRR-RSCLIENTS members {{ MESHRR_ASRANGE }};
+        }
+        {% endif %}protocols {
             bgp {
+                {% if MESHRR_FAMILY_INET != "false" %}family inet {
+                    unicast {
+                        nexthop-resolution {
+                            no-resolution;
+                        }
+                        no-install;
+                    }
+                }{% endif %}
+                {% if MESHRR_FAMILY_EVPN == "true" %}family evpn {
+                    signaling {
+                        nexthop-resolution {
+                            no-resolution;
+                        }
+                        no-install;
+                    }
+                }{% endif %}
                 group MESHRR-MESH {
                     type internal
+                    {% if MESHRR_FAMILY_INET != "false" %}family inet {
+                        unicast;
+                    }{% endif %}
+                    {% if MESHRR_FAMILY_EVPN == "true" %}family evpn {
+                        signaling;
+                    }{% endif %}
                 }
                 group MESHRR-CLIENTS {
-                    type internal;
-                    cluster {{ POD_IP }};
+                    {% if MESHRR_MODE == 'routeserver' %}type external;
+                    multihop {
+                        ttl 10;
+                        no-nexthop-change;
+                    }
+                    {% if MESHRR_FAMILY_INET != "false" %}family inet {
+                        unicast;
+                    }{% endif %}
+                    {% if MESHRR_FAMILY_EVPN %}family evpn {
+                        signaling;
+                    }{% endif %}
+                    peer-as-list MESHRR-RSCLIENTS;{% else %}type internal;
+                    cluster {{ POD_IP }};{% endif %}
                     allow {{ MESHRR_CLIENTRANGE }};
-                }{% if UPSTREAM_SERVICE_NAME is not none %}
+                }{% if UPSTREAM_SERVICE_NAME is defined and UPSTREAM_SERVICE_NAME is not none %}
                 group MESHRR-UPSTREAM {
                     type internal;
+                    {% if MESHRR_FAMILY_INET != "false" %}family inet {
+                        unicast;
+                    }{% endif %}
+                    {% if MESHRR_FAMILY_EVPN == "true" %}family evpn {
+                        signaling;
+                    }{% endif %}
                 }{% endif %}
             }
         }
     }
 }
-protocols {
-    bgp {
-        apply-groups MESHRR;
-        family inet {
-            unicast {
-                nexthop-resolution {
-                    no-resolution;
-                }
-                no-install;
-            }
-        }
-    }
-}
+apply-groups MESHRR;

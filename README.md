@@ -77,16 +77,20 @@ At this time and in the project's raw form, *meshrr* should not be considered fo
     ```
 
 ### Environment Variables
-| Variable              | Required? | Description                                                                                                                                                                                                                                                                                                  |
-| --------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| POD_IP                | Yes       | The pod's IP address. Should be set by Kubernetes (`valueFrom: fieldRef: fieldPath: status.podIP`)                                                                                                                                                                                                           |
+| Variable              | Required? | Description                                                  |
+| --------------------- | --------- | ------------------------------------------------------------ |
+| POD_IP                | Yes       | The pod's IP address. Should be set by Kubernetes (`valueFrom: fieldRef: fieldPath: status.podIP`) |
 | MESH_SERVICE_NAME     | Yes*      | The name of the mesh service. Set to the name of the headless Kubernetes service used for mesh BGP neighbor discovery. *Usually, a `MESH_SERVICE_NAME` is desirable. However, it may be skipped if there is an `UPSTREAM_SERVICE_NAME` in cases such as unmeshed regions learning routes from upstream HRRs. |
-| UPSTREAM_SERVICE_NAME | No        | The name of the upstream service. Set to the name of the headless Kubernetes service used for upstream BGP neighbor discovery. Defaults to `None`.                                                                                                                                                           |
-| KUBE_NAMESPACE        | No        | Optional name of the Kubernetes namespace. Defaults to `default`.                                                                                                                                                                                                                                            |
-| ENCRYPTED_ROOT_PW     | Yes       | Encrypted ($6) root password for cRPD                                                                                                                                                                                                                                                                        |
-| AUTONOMOUS_SYSTEM     | Yes       | ASN for the router.                                                                                                                                                                                                                                                                                          |
-| MESHRR_CLIENTRANGE    | Yes       | Range to allow. Currently, this accepts only one CIDR block. Format: `network/mask-length`                                                                                                                                                                                                                   |
-| SERVICE_ROOT_DOMAIN   | No        | Defaults to `svc.cluster.local`. You probably don't need to change this.                                                                                                                                                                                                                                     |
+| UPSTREAM_SERVICE_NAME | No        | The name of the upstream service. Set to the name of the headless Kubernetes service used for upstream BGP neighbor discovery. Defaults to `None`. |
+| KUBE_NAMESPACE        | No        | Optional name of the Kubernetes namespace. Defaults to `default`. |
+| ENCRYPTED_ROOT_PW     | Yes       | Encrypted ($6) root password for cRPD                        |
+| AUTONOMOUS_SYSTEM     | Yes       | ASN for the router.                                          |
+| MESHRR_CLIENTRANGE    | Yes       | Range to allow. Currently, this accepts only one CIDR block. Format: `network/mask-length` |
+| MESHRR_MODE           | No        | `routereflector` or `routeserver`. Defaults to `routereflector`. |
+| MESHRR_ASRANGE        | No        | Range of ASNs to allow for `routeserver` mode. Defaults to `65001-65500` |
+| MESHRR_FAMILY_INET    | No        | `true` or `false`. Defaults to `true`                         |
+| MESHRR_FAMILY_EVPN    | No        | `true` or `false`. Defaults to `false`                        |
+| SERVICE_ROOT_DOMAIN   | No        | Defaults to `svc.cluster.local`. You probably don't need to change this. |
 
 ## Methodology
 - Build container image based on crpd.
