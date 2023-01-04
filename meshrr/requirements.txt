@@ -18,7 +18,7 @@ pyserial==3.5
 python-dotenv==0.15.0
 PyYAML==5.4
 scp==0.13.3
-setuptools==39.0.1
+setuptools==65.5.1
 six==1.15.0
 transitions==0.8.5
 wheel==0.38.1
