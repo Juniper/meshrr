@@ -64,7 +64,7 @@ if __name__ == "__main__":
     # Default to Route Reflector Mode
     configvars.update({"MESHRR_MODE": getenv("MESHRR_MODE", "routereflector")})
     # Default AS Range for Route Server mode is 65001 to 65000
-    configvars.update({"MESHRR_ASRANGE": getenv("MESHRR_ASRANGE", "65001-65000")})
+    configvars.update({"MESHRR_ASRANGE": getenv("MESHRR_ASRANGE", "65001-65500")})
     # Default to inet unicast only
     configvars.update({"MESHRR_FAMILY_INET": getenv("MESHRR_FAMILY_INET", "true")})
     configvars.update({"MESHRR_FAMILY_EVPN": getenv("MESHRR_FAMILY_EVPN", "false")})
