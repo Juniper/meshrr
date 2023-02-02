@@ -51,7 +51,6 @@ groups {
                 }
                 group MESHRR-CLIENTS {
                     {% if MESHRR_MODE == 'routeserver' %}type external;
-                    route-server-client;
                     multihop {
                         ttl 10;
                         no-nexthop-change;
