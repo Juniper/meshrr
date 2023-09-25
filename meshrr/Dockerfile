@@ -27,7 +27,7 @@
 # components is subject to the terms and conditions of the respective license as
 # noted in the Third-Party source code file.
 
-FROM crpd:20.3R1.8 as prebuild
+FROM crpd:22.4R1.10 as prebuild
 
 WORKDIR /root
 

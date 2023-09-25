@@ -1,0 +1,10 @@
+apiVersion: metallb.io/v1beta2
+kind: BGPPeer
+metadata:
+  name: asn100-global-lo100
+  namespace: metallb
+spec:
+  myASN: 65000
+  peerASN: 100
+  peerAddress: 10.0.0.0
+

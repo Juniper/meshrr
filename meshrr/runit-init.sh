@@ -33,6 +33,11 @@ set -e
 
 printenv > /etc/envvars
 
+# Overwrite with existing configuration if it exists.
+if [ -f "/config/juniper.conf" ]; then
+	sed "s/^\(.\+router-id\) [0-9]\+\.[0-9]\+\.[0-9]\+\.[0-9]\+/\1 {{ POD_IP }};/" /config/juniper.conf > juniper.conf.j2
+fi
+
 ./render_config.py -i juniper.conf.j2 -o /config/juniper.conf
 
 # Install crontab. Expect non-zero status for crontab -l
