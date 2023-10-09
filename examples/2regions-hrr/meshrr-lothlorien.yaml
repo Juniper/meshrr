@@ -1,4 +1,74 @@
 ---
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: meshrr-lothlorien
+  namespace: metallb
+spec:
+  addresses:
+  - 172.19.1.1/32
+  - 172.19.1.2/32
+  autoAssign: false
+---
+apiVersion: metallb.io/v1beta1
+kind: BGPAdvertisement
+metadata:
+  name: meshrr-lothlorien
+  namespace: metallb
+spec:
+  ipAddressPools:
+  - meshrr-lothlorien
+---
+apiVersion: v1
+kind: Service
+metadata:
+  creationTimestamp: null
+  name: meshrr-lothlorien-a
+  selfLink: /api/v1/namespaces/default/services/meshrr-lothlorien-a
+  annotations:
+    metallb.universe.tf/address-pool: meshrr-lothlorien
+spec:
+  ports:
+  - name: bgp
+    port: 179
+    protocol: TCP
+    targetPort: bgp
+  selector:
+    app: meshrr
+    meshrr_region_lothlorien: "true"
+    redundancy_group: a
+  sessionAffinity: None
+  type: LoadBalancer
+  loadBalancerIP: 172.19.1.1
+  externalTrafficPolicy: Local
+status:
+  loadBalancer: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  creationTimestamp: null
+  name: meshrr-lothlorien-b
+  selfLink: /api/v1/namespaces/default/services/meshrr-lothlorien-b
+  annotations:
+    metallb.universe.tf/address-pool: meshrr-lothlorien
+spec:
+  ports:
+  - name: bgp
+    port: 179
+    protocol: TCP
+    targetPort: bgp
+  selector:
+    app: meshrr
+    meshrr_region_lothlorien: "true"
+    redundancy_group: b
+  sessionAffinity: None
+  type: LoadBalancer
+  loadBalancerIP: 172.19.1.2
+  externalTrafficPolicy: Local
+status:
+  loadBalancer: {}
+---
 apiVersion: v1
 kind: Service
 metadata:
@@ -19,7 +89,6 @@ spec:
   type: ClusterIP
 status:
   loadBalancer: {}
-
 ---
 apiVersion: apps/v1
 kind: DaemonSet
@@ -90,7 +159,6 @@ spec:
               containerPort: 179
               protocol: TCP
               hostIP: 172.19.1.1
-              hostPort: 179
           env:
             - name: POD_IP
               valueFrom:
@@ -205,7 +273,6 @@ spec:
               containerPort: 179
               protocol: TCP
               hostIP: 172.19.1.2
-              hostPort: 179
           env:
             - name: POD_IP
               valueFrom:
