@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright (c) Juniper Networks, Inc., 2020. All rights reserved.
+# Copyright (c) Juniper Networks, Inc., 2023. All rights reserved.
 #
 # Notice and Disclaimer: This code is licensed to you under the MIT License (the
 # "License"). You may not use this code except in compliance with the License.
@@ -186,7 +186,7 @@ if __name__ == "__main__":
     service_root_domain = getenv("SERVICE_ROOT_DOMAIN", "svc.cluster.local")
 
     # Open a connection to the device
-    dev = Device()
+    dev = Device(host="127.0.0.1",user="meshrr",ssh_private_key_file="/secret/ssh/id_ed25519")
     dev.open()
     with ConfigUpdate(dev, mode="private") as cu:
 

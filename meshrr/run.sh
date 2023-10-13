@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 # Copyright (c) Juniper Networks, Inc., 2020. All rights reserved.
 # 
@@ -33,20 +33,31 @@ set -e
 
 printenv > /etc/envvars
 
-# Overwrite with existing configuration if it exists.
-if [ -f "/config/juniper.conf" ]; then
-	sed "s/^\(.\+router-id\) [0-9]\+\.[0-9]\+\.[0-9]\+\.[0-9]\+/\1 {{ POD_IP }};/" /config/juniper.conf > juniper.conf.j2
+if [ $# -eq 0 ]; then
+	echo "One of the following arguments required: init, sidecar"
+	exit 1
+elif [ $1 = 'init' ]; then
+	echo "Initializing pod"
+	# Overwrite with existing configuration if it exists.
+	if [ -f "/config/juniper.conf" ]; then
+		echo "Existing configuration detected; overwriting pod IP only."
+		sed "s/^\(.\+router-id\) [0-9]\+\.[0-9]\+\.[0-9]\+\.[0-9]\+/\1 {{ POD_IP }};/" /config/juniper.conf > juniper.conf.j2
+	else
+		echo "Initializing fresh configuration from template."
+	fi
+	# Generate a fresh SSH key and apply to configuration template.
+	ssh-keygen -q -t ed25519 -f /secret/ssh/id_ed25519 -P ""
+	PUBKEY=`cat \/secret\/ssh\/id_ed25519.pub | tr -d '\r\n'`
+	sed -i "/user meshrr/,/SECRET-DATA/ s~ssh-ed25519.*~ssh-ed25519 \"$PUBKEY\"; ## SECRET-DATA~" juniper.conf.j2
+	./render_config.py -i juniper.conf.j2 -o /config/juniper.conf
+elif [ $1 = 'sidecar' ]; then
+	echo "Initializing peer maintenance every ${UPDATE_SECONDS:=30} seconds."
+	while true; do
+		./update_peers.py
+		sleep ${UPDATE_SECONDS}
+	done
+else
+	echo "Invalid argument: $1"
 fi
 
-./render_config.py -i juniper.conf.j2 -o /config/juniper.conf
 
-# Install crontab. Expect non-zero status for crontab -l
-line="* * * * * /root/update_peers.py >> /var/log/update_peers 2>&1"
-set +e
-
-# crontab group doesn't seem to be created in docker build.
-dpkg-reconfigure cron
-(crontab -l 2>/dev/null; echo "$line" ) | crontab -
-set -e
-
-exec /sbin/runit-init 0

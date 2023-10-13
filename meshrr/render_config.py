@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright (c) Juniper Networks, Inc., 2020. All rights reserved.
+# Copyright (c) Juniper Networks, Inc., 2023. All rights reserved.
 # 
 # Notice and Disclaimer: This code is licensed to you under the MIT License (the
 # "License"). You may not use this code except in compliance with the License.
@@ -47,6 +47,9 @@ if __name__ == "__main__":
     template = Template(args.inputfile.read())
 
     configvars = dict()
+    configvars.update({"LICENSE_KEY": getenv("LICENSE_KEY", None)})
+    if not configvars["LICENSE_KEY"]:
+        raise (Exception("LICENSE_KEY is not set."))
     configvars.update({"ENCRYPTED_ROOT_PW": getenv("ENCRYPTED_ROOT_PW", None)})
     if not configvars["ENCRYPTED_ROOT_PW"]:
         raise (Exception("ENCRYPTED_ROOT_PW is not set."))
@@ -63,7 +66,7 @@ if __name__ == "__main__":
 
     # Default to Route Reflector Mode
     configvars.update({"MESHRR_MODE": getenv("MESHRR_MODE", "routereflector")})
-    # Default AS Range for Route Server mode is 65001 to 65000
+    # Default AS Range for Route Server mode is 65001 to 65500
     configvars.update({"MESHRR_ASRANGE": getenv("MESHRR_ASRANGE", "65001-65500")})
     # Default to inet unicast only
     configvars.update({"MESHRR_FAMILY_INET": getenv("MESHRR_FAMILY_INET", "true")})

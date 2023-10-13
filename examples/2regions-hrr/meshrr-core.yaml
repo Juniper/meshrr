@@ -47,16 +47,43 @@ spec:
       dnsPolicy: ClusterFirst
       terminationGracePeriodSeconds: 30
       volumes:
-        - name: crpd-license
-          secret:
-            secretName: crpd-license
-            items:
-              - key: junos_sfnt.lic
-                path: junos_sfnt.lic
+        - name: config
+          emptyDir: {}
+        - name: ssh-id
+          emptyDir: {}
+      initContainers:
+        - name: meshrr-init
+          image: meshrr:v0.2
+          imagePullPolicy: IfNotPresent
+          args: ["init"]
+          volumeMounts:
+            - name: ssh-id
+              mountPath: /secret/ssh/
+            - name: config
+              mountPath: /config/
+          env:
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: LICENSE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: crpd-license
+                  key: crpd-license
+            - name: AUTONOMOUS_SYSTEM
+              value: '65000'
+            - name: ENCRYPTED_ROOT_PW
+              value: >-
+                $6$4XN/d$QdZrrRZNL2MtGXqKuZ/mr1S5tH46eyBKTKeWGVugxfqCGjKKqH2LhP8yNoqfYwVNvc0xsd0JSl6s9epsSPB7M1
+            - name: MESH_SERVICE_NAME
+              value: meshrr-core
+            - name: MESHRR_CLIENTRANGE
+              value: 0/0
       containers:
-        - name: meshrr-core
-          image: <registryURL>/meshrr:latest
-          imagePullPolicy: Always
+        - name: crpd
+          image: crpd:23.2R1.13
+          imagePullPolicy: IfNotPresent
           livenessProbe:
             failureThreshold: 3
             initialDelaySeconds: 15
@@ -94,13 +121,33 @@ spec:
             - name: MESHRR_CLIENTRANGE
               value: 0/0
           volumeMounts:
-            - name: crpd-license
-              mountPath: /config/license/safenet/
-              subPath: ''
+            - name: config
+              mountPath: /config/
           securityContext:
             allowPrivilegeEscalation: true
             privileged: true
             runAsNonRoot: false
+        - name: meshrr
+          image: meshrr:v0.2
+          imagePullPolicy: IfNotPresent
+          args: ["sidecar"]
+          volumeMounts:
+            - name: ssh-id
+              mountPath: /secret/ssh/
+          env:
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: AUTONOMOUS_SYSTEM
+              value: '65000'
+            - name: ENCRYPTED_ROOT_PW
+              value: >-
+                $6$4XN/d$QdZrrRZNL2MtGXqKuZ/mr1S5tH46eyBKTKeWGVugxfqCGjKKqH2LhP8yNoqfYwVNvc0xsd0JSl6s9epsSPB7M1
+            - name: MESH_SERVICE_NAME
+              value: meshrr-core
+            - name: MESHRR_CLIENTRANGE
+              value: 0/0
       imagePullSecrets:
         - name: regcred
       affinity:
