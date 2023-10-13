@@ -106,20 +106,6 @@ spec:
             - name: bgp
               containerPort: 179
               protocol: TCP
-          env:
-            - name: POD_IP
-              valueFrom:
-                fieldRef:
-                  fieldPath: status.podIP
-            - name: AUTONOMOUS_SYSTEM
-              value: '65000'
-            - name: ENCRYPTED_ROOT_PW
-              value: >-
-                $6$4XN/d$QdZrrRZNL2MtGXqKuZ/mr1S5tH46eyBKTKeWGVugxfqCGjKKqH2LhP8yNoqfYwVNvc0xsd0JSl6s9epsSPB7M1
-            - name: MESH_SERVICE_NAME
-              value: meshrr-core
-            - name: MESHRR_CLIENTRANGE
-              value: 0/0
           volumeMounts:
             - name: config
               mountPath: /config/
@@ -139,11 +125,6 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: status.podIP
-            - name: AUTONOMOUS_SYSTEM
-              value: '65000'
-            - name: ENCRYPTED_ROOT_PW
-              value: >-
-                $6$4XN/d$QdZrrRZNL2MtGXqKuZ/mr1S5tH46eyBKTKeWGVugxfqCGjKKqH2LhP8yNoqfYwVNvc0xsd0JSl6s9epsSPB7M1
             - name: MESH_SERVICE_NAME
               value: meshrr-core
             - name: MESHRR_CLIENTRANGE
