@@ -2,6 +2,25 @@ system {
     root-authentication {
         encrypted-password "{{ ENCRYPTED_ROOT_PW }}"; ## SECRET-DATA
     }
+    login {
+        user meshrr {
+            class super-user;
+            uid 100;
+            authentication {
+                ssh-ed25519 "ssh-ed25519 TBD"; ## SECRET-DATA
+            }
+        }
+    }
+    services {
+        netconf {
+            ssh;
+        }
+    }
+    license {
+        keys {
+            key "{{ LICENSE_KEY }}";
+        }
+    }
     processes {
         routing {
             bgp {
