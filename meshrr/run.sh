@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# Copyright (c) Juniper Networks, Inc., 2020. All rights reserved.
+# Copyright (c) Juniper Networks, Inc., 2023. All rights reserved.
 # 
 # Notice and Disclaimer: This code is licensed to you under the MIT License (the
 # "License"). You may not use this code except in compliance with the License.
