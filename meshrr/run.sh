@@ -48,6 +48,10 @@ elif [ $1 = 'init' ]; then
 	# Generate a fresh SSH key and apply to configuration template.
 	ssh-keygen -q -t ed25519 -f /secret/ssh/id_ed25519 -P ""
 	PUBKEY=`cat \/secret\/ssh\/id_ed25519.pub | tr -d '\r\n'`
+	# If /opt/meshrr/overrides/juniper.conf.j2 exists, overwrite the default juniper.conf.j2 location.
+	if test -f overrides/juniper.conf.j2; then
+		cp overrides/juniper.conf.j2 juniper.conf.j2
+	fi
 	sed -i "/user meshrr/,/SECRET-DATA/ s~ssh-ed25519.*~ssh-ed25519 \"$PUBKEY\"; ## SECRET-DATA~" juniper.conf.j2
 	./render_config.py -i juniper.conf.j2 -o /config/juniper.conf
 elif [ $1 = 'sidecar' ]; then
