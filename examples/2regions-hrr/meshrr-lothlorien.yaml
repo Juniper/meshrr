@@ -132,7 +132,7 @@ spec:
           name: override-config
       initContainers:
         - name: meshrr-init
-          image: meshrr:v0.2
+          image: ghcr.io/juniper/meshrr:v0.2
           imagePullPolicy: IfNotPresent
           args: ["init"]
           volumeMounts:
@@ -167,7 +167,7 @@ spec:
               value: 0/0
       containers:
         - name: crpd
-          image: crpd:23.2R1.13
+          image: localhost/juniper/crpd:23.2R1.13
           imagePullPolicy: IfNotPresent
           livenessProbe:
             failureThreshold: 3
@@ -200,7 +200,7 @@ spec:
             privileged: true
             runAsNonRoot: false
         - name: meshrr
-          image: meshrr:v0.2
+          image: ghcr.io/juniper/meshrr:v0.2
           imagePullPolicy: IfNotPresent
           args: ["sidecar"]
           volumeMounts:
@@ -276,7 +276,7 @@ spec:
           name: override-config
       initContainers:
         - name: meshrr-init
-          image: meshrr:v0.2
+          image: ghcr.io/juniper/meshrr:v0.2
           imagePullPolicy: IfNotPresent
           args: ["init"]
           volumeMounts:
@@ -311,7 +311,7 @@ spec:
               value: 0/0
       containers:
         - name: crpd
-          image: crpd:23.2R1.13
+          image: localhost/juniper/crpd:23.2R1.13
           imagePullPolicy: IfNotPresent
           livenessProbe:
             failureThreshold: 3
@@ -344,7 +344,7 @@ spec:
             privileged: true
             runAsNonRoot: false
         - name: meshrr
-          image: meshrr:v0.2
+          image: ghcr.io/juniper/meshrr:v0.2
           imagePullPolicy: IfNotPresent
           args: ["sidecar"]
           volumeMounts:
