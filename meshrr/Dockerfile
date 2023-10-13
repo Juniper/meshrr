@@ -43,8 +43,10 @@ COPY render_config.py /opt/meshrr/
 COPY run.sh /opt/meshrr/
 COPY juniper.conf.j2 /opt/meshrr/
 COPY update_peers.py /opt/meshrr/
+COPY connect_wait.py /opt/meshrr/
 
 RUN chmod +x /opt/meshrr/run.sh
+RUN chmod +x /opt/meshrr/connect_wait.py
 RUN chmod +x /opt/meshrr/update_peers.py
 RUN chmod +x /opt/meshrr/render_config.py
 

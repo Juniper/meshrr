@@ -117,6 +117,13 @@ spec:
           image: ghcr.io/juniper/meshrr:v0.2
           imagePullPolicy: IfNotPresent
           args: ["sidecar"]
+          startupProbe:
+            exec:
+              command:
+              - cat
+              - /tmp/connected-to-crpd
+            initialDelaySeconds: 5
+            periodSeconds: 3
           volumeMounts:
             - name: ssh-id
               mountPath: /secret/ssh/
