@@ -168,7 +168,7 @@ spec:
       containers:
         - name: crpd
           image: localhost/juniper/crpd:23.2R1.13
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Never
           livenessProbe:
             failureThreshold: 3
             initialDelaySeconds: 15
@@ -223,8 +223,6 @@ spec:
               value: meshrr-core
             - name: MESHRR_CLIENTRANGE
               value: 0/0
-      imagePullSecrets:
-        - name: regcred
       affinity:
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
@@ -318,7 +316,7 @@ spec:
       containers:
         - name: crpd
           image: localhost/juniper/crpd:23.2R1.13
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Never
           livenessProbe:
             failureThreshold: 3
             initialDelaySeconds: 15
@@ -373,8 +371,6 @@ spec:
               value: meshrr-core
             - name: MESHRR_CLIENTRANGE
               value: 0/0
-      imagePullSecrets:
-        - name: regcred
       affinity:
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
