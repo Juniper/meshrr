@@ -34,16 +34,18 @@ WORKDIR /opt/meshrr
 COPY requirements.txt /opt/meshrr/
 
 RUN apk add --update --no-cache python3 py3-pip openssh \
-    && pip3 install -r requirements.txt \
-    && mkdir -p /config /secret/ssh
+    && pip3 install -r requirements.txt
 
 FROM meshrr-prebuild
 
+RUN mkdir -p /config /secret/ssh conf
+
 COPY render_config.py /opt/meshrr/
 COPY run.sh /opt/meshrr/
-COPY juniper.conf.j2 /opt/meshrr/
+COPY defaults/ /opt/meshrr/defaults/
 COPY update_peers.py /opt/meshrr/
 COPY connect_wait.py /opt/meshrr/
+COPY ../LICENSE /opt/meshrr/
 
 RUN chmod +x /opt/meshrr/run.sh
 RUN chmod +x /opt/meshrr/connect_wait.py

@@ -41,19 +41,26 @@ elif [ $1 = 'init' ]; then
 	# Overwrite with existing configuration if it exists.
 	if [ -f "/config/juniper.conf" ]; then
 		echo "Existing configuration detected; overwriting pod IP only."
-		sed "s/^\(.\+router-id\) [0-9]\+\.[0-9]\+\.[0-9]\+\.[0-9]\+/\1 {{ POD_IP }};/" /config/juniper.conf > juniper.conf.j2
-	else
-		echo "Initializing fresh configuration from template."
+		sed "s/^\(.\+router-id\) [0-9]\+\.[0-9]\+\.[0-9]\+\.[0-9]\+/\1 {{ POD_IP }};/" /config/juniper.conf > conf/juniper.conf.j2
+	elif ! test -f conf/juniper.conf.j2; then
+		if [[ "$MESHRR_MODE" == 'evpnrs' ]] || [[ "$MESHRR_MODE" == 'routeserver' ]] ; then
+			template='juniper-evpnrs.conf.j2'
+		elif [[ "$MESHRR_MODE" == 'ipv4rr' ]] || [[ "$MESHRR_MODE" == 'routereflector' ]] || [[ -z $MESHRR_MODE ]]; then
+			template='juniper-ipv4rr.conf.j2'
+		else 
+			echo "Invalid MESHRR_MODE set. Must be empty or one of [ 'evpnrs' 'ipv4rr' ]."
+			exit 1
+		fi
+		echo "Initializing fresh configuration from defaults/${template}."
+		cp defaults/${template} conf/juniper.conf.j2
+	else # Don't overwrite template since it's been explicitly mounted.
+		echo "Custom configuration provided; using conf/juniper.conf.j2 template."
 	fi
 	# Generate a fresh SSH key and apply to configuration template.
 	ssh-keygen -q -t ed25519 -f /secret/ssh/id_ed25519 -P ""
 	PUBKEY=`cat \/secret\/ssh\/id_ed25519.pub | tr -d '\r\n'`
-	# If /opt/meshrr/overrides/juniper.conf.j2 exists, overwrite the default juniper.conf.j2 location.
-	if test -f overrides/juniper.conf.j2; then
-		cp overrides/juniper.conf.j2 juniper.conf.j2
-	fi
-	sed -i "/user meshrr/,/SECRET-DATA/ s~ssh-ed25519.*~ssh-ed25519 \"$PUBKEY\"; ## SECRET-DATA~" juniper.conf.j2
-	./render_config.py -i juniper.conf.j2 -o /config/juniper.conf
+	sed -i "/user meshrr/,/SECRET-DATA/ s~ssh-ed25519.*~ssh-ed25519 \"$PUBKEY\"; ## SECRET-DATA~" conf/juniper.conf.j2
+	./render_config.py -i conf/juniper.conf.j2 -o /config/juniper.conf
 elif [ $1 = 'sidecar' ]; then
 	# Wait for cRPD container to become available for netconf.
 	./connect_wait.py
