@@ -1,6 +1,6 @@
 system {
     root-authentication {
-        encrypted-password "{{ ENCRYPTED_ROOT_PW }}"; ## SECRET-DATA
+        encrypted-password "{{ encrypted_root_pw }}"; ## SECRET-DATA
     }
     login {
         user meshrr {
@@ -40,7 +40,7 @@ groups {
                 group MESHRR-CLIENTS {
                     type internal;
                     cluster {{ POD_IP }};
-                    allow {{ MESHRR_CLIENTRANGE }};
+                    allow [ {% for prefix in bgpgroups_subtractive['MESHRR-CLIENTS'].prefixes %}{{ prefix }} {% endfor %}];
                 }{% if UPSTREAM_SERVICE_NAME is not none %}
                 group MESHRR-UPSTREAM {
                     type internal;
@@ -68,7 +68,7 @@ policy-options {
     community INREGION-PREFERRED members 65000:102;
 }
 routing-options {
-    autonomous-system {{ AUTONOMOUS_SYSTEM }};
+    autonomous-system {{ asn }};
     router-id {{ POD_IP }};
 }
 protocols {

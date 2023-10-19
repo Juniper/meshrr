@@ -1,4 +1,30 @@
 ---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: meshrr-mirkwood-conf
+data:
+  meshrr.conf.yml: |+
+    encrypted_root_pw: NOLOGIN
+    asn: "65000"
+    mode: ipv4rr
+    bgpgroups:
+    - name: MESHRR-MESH
+      type: mesh
+      source:
+        sourcetype: dns
+        hostname: meshrr-mirkwood
+    - name: MESHRR-CLIENTS
+      type: subtractive
+      prefixes:
+      - 0.0.0.0/0
+    - name: MESHRR-UPSTREAM
+      type: mesh
+      source:
+        sourcetype: dns
+        hostname: meshrr-core
+      max_peers: 2
+---
 apiVersion: metallb.io/v1beta1
 kind: IPAddressPool
 metadata:
@@ -122,6 +148,15 @@ spec:
           emptyDir: {}
         - name: ssh-id
           emptyDir: {}
+        - name: meshrr-conf
+          configMap:
+            defaultMode: 256
+            items:
+            - key: meshrr.conf.yml
+              mode: 256
+              path: meshrr.conf.yml
+            name: meshrr-mirkwood-conf
+            optional: false
         - configMap:
             defaultMode: 256
             items:
@@ -141,7 +176,11 @@ spec:
               mountPath: /secret/ssh/
             - name: config
               mountPath: /config/
-            - mountPath: /opt/meshrr/overrides/juniper.conf.j2
+            - name: meshrr-conf
+              mountPath: /opt/meshrr/conf/meshrr.conf.yml
+              readOnly: true
+              subPath: meshrr.conf.yml
+            - mountPath: /opt/meshrr/conf/juniper.conf.j2
               name: override-config
               readOnly: true
               subPath: juniper.conf.j2
@@ -155,17 +194,6 @@ spec:
                 secretKeyRef:
                   name: crpd-license
                   key: crpd-license
-            - name: AUTONOMOUS_SYSTEM
-              value: '65000'
-            - name: ENCRYPTED_ROOT_PW
-              value: >-
-                $6$4XN/d$QdZrrRZNL2MtGXqKuZ/mr1S5tH46eyBKTKeWGVugxfqCGjKKqH2LhP8yNoqfYwVNvc0xsd0JSl6s9epsSPB7M1
-            - name: MESH_SERVICE_NAME
-              value: meshrr-mirkwood
-            - name: UPSTREAM_SERVICE_NAME
-              value: meshrr-core
-            - name: MESHRR_CLIENTRANGE
-              value: 0/0
       containers:
         - name: crpd
           image: localhost/juniper/crpd:23.2R1.13
@@ -213,17 +241,15 @@ spec:
           volumeMounts:
             - name: ssh-id
               mountPath: /secret/ssh/
+            - name: meshrr-conf
+              mountPath: /opt/meshrr/conf/meshrr.conf.yml
+              readOnly: true
+              subPath: meshrr.conf.yml
           env:
             - name: POD_IP
               valueFrom:
                 fieldRef:
                   fieldPath: status.podIP
-            - name: MESH_SERVICE_NAME
-              value: meshrr-mirkwood
-            - name: UPSTREAM_SERVICE_NAME
-              value: meshrr-core
-            - name: MESHRR_CLIENTRANGE
-              value: 0/0
       affinity:
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
@@ -270,6 +296,15 @@ spec:
           emptyDir: {}
         - name: ssh-id
           emptyDir: {}
+        - name: meshrr-conf
+          configMap:
+            defaultMode: 256
+            items:
+            - key: meshrr.conf.yml
+              mode: 256
+              path: meshrr.conf.yml
+            name: meshrr-mirkwood-conf
+            optional: false
         - configMap:
             defaultMode: 256
             items:
@@ -289,7 +324,11 @@ spec:
               mountPath: /secret/ssh/
             - name: config
               mountPath: /config/
-            - mountPath: /opt/meshrr/overrides/juniper.conf.j2
+            - name: meshrr-conf
+              mountPath: /opt/meshrr/conf/meshrr.conf.yml
+              readOnly: true
+              subPath: meshrr.conf.yml
+            - mountPath: /opt/meshrr/conf/juniper.conf.j2
               name: override-config
               readOnly: true
               subPath: juniper.conf.j2
@@ -303,17 +342,6 @@ spec:
                 secretKeyRef:
                   name: crpd-license
                   key: crpd-license
-            - name: AUTONOMOUS_SYSTEM
-              value: '65000'
-            - name: ENCRYPTED_ROOT_PW
-              value: >-
-                $6$4XN/d$QdZrrRZNL2MtGXqKuZ/mr1S5tH46eyBKTKeWGVugxfqCGjKKqH2LhP8yNoqfYwVNvc0xsd0JSl6s9epsSPB7M1
-            - name: MESH_SERVICE_NAME
-              value: meshrr-mirkwood
-            - name: UPSTREAM_SERVICE_NAME
-              value: meshrr-core
-            - name: MESHRR_CLIENTRANGE
-              value: 0/0
       containers:
         - name: crpd
           image: localhost/juniper/crpd:23.2R1.13
@@ -361,17 +389,15 @@ spec:
           volumeMounts:
             - name: ssh-id
               mountPath: /secret/ssh/
+            - name: meshrr-conf
+              mountPath: /opt/meshrr/conf/meshrr.conf.yml
+              readOnly: true
+              subPath: meshrr.conf.yml
           env:
             - name: POD_IP
               valueFrom:
                 fieldRef:
                   fieldPath: status.podIP
-            - name: MESH_SERVICE_NAME
-              value: meshrr-mirkwood
-            - name: UPSTREAM_SERVICE_NAME
-              value: meshrr-core
-            - name: MESHRR_CLIENTRANGE
-              value: 0/0
       affinity:
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
