@@ -40,6 +40,7 @@ FROM meshrr-prebuild
 
 RUN mkdir -p /config /secret/ssh conf
 
+COPY config.py /opt/meshrr/
 COPY render_config.py /opt/meshrr/
 COPY run.sh /opt/meshrr/
 COPY defaults/ /opt/meshrr/defaults/

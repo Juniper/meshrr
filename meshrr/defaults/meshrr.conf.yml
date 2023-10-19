@@ -1,0 +1,22 @@
+encrypted_root_pw: NOLOGIN
+asn: "65000"
+mode: ipv4rr
+bgpgroups:
+- name: MESHRR-MESH
+  type: mesh
+  source:
+    sourcetype: dns
+    hostname: meshrr # FQDN for svc required if not in same namespace
+- name: MESHRR-CLIENTS
+  type: subtractive # Prefixes in multiple external-subtractive groups must not overlap
+  prefixes:
+  - 0.0.0.0/0
+  # For routeserver use case, an AS range is needed; we don't set this for RR use case.
+  # asranges:
+  # - 65001-65500
+- name: MESHRR-UPSTREAM
+  type: mesh
+  source:
+    sourcetype: dns
+    hostname: meshrr.core.svc.cluster.local # FQDN required if svc not in same namespace
+  max_peers: 2

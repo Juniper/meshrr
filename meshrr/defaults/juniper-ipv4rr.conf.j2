@@ -1,6 +1,6 @@
 system {
     root-authentication {
-        encrypted-password "{{ ENCRYPTED_ROOT_PW }}"; ## SECRET-DATA
+        encrypted-password "{{ encrypted_root_pw }}"; ## SECRET-DATA
     }
     login {
         user meshrr {
@@ -33,66 +33,38 @@ system {
     }
 }
 routing-options {
-    autonomous-system {{ AUTONOMOUS_SYSTEM }};
+    autonomous-system {{ asn }};
     router-id {{ POD_IP }};
 }
 groups {
     MESHRR {
-        {% if MESHRR_MODE == 'routeserver' %}policy-options {
-            as-list MESHRR-RSCLIENTS members {{ MESHRR_ASRANGE }};
-        }
-        {% endif %}protocols {
+        protocols {
             bgp {
-                {% if MESHRR_FAMILY_INET != "false" %}family inet {
+                family inet {
                     unicast {
                         nexthop-resolution {
                             no-resolution;
                         }
                         no-install;
                     }
-                }{% endif %}
-                {% if MESHRR_FAMILY_EVPN == "true" %}family evpn {
-                    signaling {
-                        nexthop-resolution {
-                            no-resolution;
-                        }
-                        no-install;
-                    }
-                }{% endif %}
-                group MESHRR-MESH {
-                    type internal
-                    {% if MESHRR_FAMILY_INET != "false" %}family inet {
-                        unicast;
-                    }{% endif %}
-                    {% if MESHRR_FAMILY_EVPN == "true" %}family evpn {
-                        signaling;
-                    }{% endif %}
                 }
-                group MESHRR-CLIENTS {
-                    {% if MESHRR_MODE == 'routeserver' %}type external;
-                    multihop {
-                        ttl 10;
-                        no-nexthop-change;
+                {%- for bgpgroup in bgpgroups_mesh %}
+                /* Mesh {% if bgpgroup.max_peers is defined %}max_peers:{{ bgpgroup.max_peers }} {% endif %}group from {{ bgpgroup.source.sourcetype }}:{{ bgpgroup.source.hostname }} */
+                group {{ bgpgroup.name }} {
+                    type internal
+                    family inet {
+                        unicast;
                     }
-                    {% if MESHRR_FAMILY_INET != "false" %}family inet {
-                        unicast;
-                    }{% endif %}
-                    {% if MESHRR_FAMILY_EVPN %}family evpn {
-                        signaling;
-                    }{% endif %}
-                    peer-as-list MESHRR-RSCLIENTS;{% else %}type internal;
-                    cluster {{ POD_IP }};{% endif %}
-                    allow {{ MESHRR_CLIENTRANGE }};
-                }{% if UPSTREAM_SERVICE_NAME is defined and UPSTREAM_SERVICE_NAME is not none %}
-                group MESHRR-UPSTREAM {
+                }
+                {%- endfor %}
+                {%- for bgpgroup in bgpgroups_subtractive %}
+                /* Subtractive group from {{ bgpgroup.prefixes }} */
+                group {{ bgpgroup.name }} {
                     type internal;
-                    {% if MESHRR_FAMILY_INET != "false" %}family inet {
-                        unicast;
-                    }{% endif %}
-                    {% if MESHRR_FAMILY_EVPN == "true" %}family evpn {
-                        signaling;
-                    }{% endif %}
-                }{% endif %}
+                    cluster {{ POD_IP }};
+                    allow [ {% for prefix in bgpgroup.prefixes %}{{ prefix }} {% endfor %}];
+                }
+                {%- endfor %}
             }
         }
     }
