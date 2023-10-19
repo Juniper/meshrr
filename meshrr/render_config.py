@@ -63,8 +63,8 @@ if __name__ == "__main__":
     configvars.update({
         "encrypted_root_pw": mconf.encrypted_root_pw,
         "asn": mconf.asn,
-        "bgpgroups_mesh": mconf.bgpgroups_mesh,
-        "bgpgroups_subtractive": mconf.bgpgroups_subtractive
+        "bgpgroups_mesh": mconf.get_bgpgroups_dict('mesh'),
+        "bgpgroups_subtractive": mconf.get_bgpgroups_dict('subtractive')
         })
 
     crpd_config = template.render(configvars)

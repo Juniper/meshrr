@@ -49,8 +49,8 @@ groups {
                     }
                 }
                 {%- for bgpgroup in bgpgroups_mesh %}
-                /* Mesh {% if bgpgroup.max_peers is defined %}max_peers:{{ bgpgroup.max_peers }} {% endif %}group from {{ bgpgroup.source.sourcetype }}:{{ bgpgroup.source.hostname }} */
-                group {{ bgpgroup.name }} {
+                /* Mesh {% if bgpgroups_mesh[bgpgroup].max_peers is defined %}max_peers:{{ bgpgroups_mesh[bgpgroup].max_peers }} {% endif %}group from {{ bgpgroups_mesh[bgpgroup].source.sourcetype }}:{{ bgpgroups_mesh[bgpgroup].source.hostname }} */
+                group {{ bgpgroup }} {
                     type internal
                     family inet {
                         unicast;
@@ -58,11 +58,11 @@ groups {
                 }
                 {%- endfor %}
                 {%- for bgpgroup in bgpgroups_subtractive %}
-                /* Subtractive group from {{ bgpgroup.prefixes }} */
-                group {{ bgpgroup.name }} {
+                /* Subtractive group from {{ bgpgroups_subtractive[bgpgroup].prefixes }} */
+                group {{ bgpgroup }} {
                     type internal;
                     cluster {{ POD_IP }};
-                    allow [ {% for prefix in bgpgroup.prefixes %}{{ prefix }} {% endfor %}];
+                    allow [ {% for prefix in bgpgroups_subtractive[bgpgroup].prefixes %}{{ prefix }} {% endfor %}];
                 }
                 {%- endfor %}
             }

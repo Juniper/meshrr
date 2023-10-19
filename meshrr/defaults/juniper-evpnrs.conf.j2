@@ -40,7 +40,7 @@ groups {
     MESHRR {
         policy-options {
             {%- for bgpgroup in bgpgroups_subtractive %}
-            as-list MESHRR:{{ bgpgroup.name }} members [ {% for asrange in bgpgroup.asranges %}{{ asrange }} {% endfor %}];
+            as-list MESHRR:{{ bgpgroup }} members [ {% for asrange in bgpgroups_subtractive[bgpgroup].asranges %}{{ asrange }} {% endfor %}];
             {%- endfor %}
         }
         protocols {
@@ -54,8 +54,8 @@ groups {
                     }
                 }
                 }{%- for bgpgroup in bgpgroups_mesh %}
-                /* Mesh {% if bgpgroup.max_peers is defined %}max_peers:{{ bgpgroup.max_peers }} {% endif %}group from {{ bgpgroup.source.sourcetype }}:{{ bgpgroup.source.hostname }} */
-                group {{ bgpgroup.name }} {
+                /* Mesh {% if bgpgroups_mesh[bgpgroup].max_peers is defined %}max_peers:{{ bgpgroups_mesh[bgpgroup].max_peers }} {% endif %}group from {{ bgpgroups_mesh[bgpgroup].source.sourcetype }}:{{ bgpgroups_mesh[bgpgroup].source.hostname }} */
+                group {{ bgpgroup }} {
                     type internal
                     family evpn {
                         signaling;
@@ -63,8 +63,8 @@ groups {
                 }
                 {%- endfor %}
                 {%- for bgpgroup in bgpgroups_subtractive %}
-                /* Subtractive group from {{ bgpgroup.prefixes }} */
-                group {{ bgpgroup.name }} {
+                /* Subtractive group from {{ bgpgroups_subtractive[bgpgroup].prefixes }} */
+                group {{ bgpgroup }} {
                     type external;
                     multihop {
                         ttl 10;
@@ -73,8 +73,8 @@ groups {
                     family evpn {
                         signaling;
                     }
-                    peer-as-list MESHRR:{{ bgpgroup.name }};
-                    allow [ {% for prefix in bgpgroup.prefixes %}{{ prefix }} {% endfor %}];
+                    peer-as-list MESHRR:{{ bgpgroup }};
+                    allow [ {% for prefix in bgpgroups_subtractive[bgpgroup].prefixes %}{{ prefix }} {% endfor %}];
                 }
                 {%- endfor %}
             }

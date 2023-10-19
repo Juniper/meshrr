@@ -76,3 +76,16 @@ class Meshrrconfig:
                 self.bgpgroups_subtractive.append(group)
             else:
                 raise(Exception("Invalid `type` in bgpgroup: "+str(group)))
+            
+    def get_bgpgroups_dict(self, grouptype):
+        if grouptype == 'mesh':
+            bgpgroups = self.bgpgroups_mesh
+        elif grouptype == 'subtractive':
+            bgpgroups = self.bgpgroups_subtractive
+        else:
+            raise Exception("Invalid grouptype: ${grouptype}")
+        retval = dict()
+        for bgpgroup in bgpgroups:
+            retval.update({bgpgroup.pop('name'): bgpgroup})
+        return retval
+        
