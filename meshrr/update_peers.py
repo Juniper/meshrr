@@ -49,16 +49,16 @@ if not pod_ip:
 class ConfigUpdate(Config):
     # Child class to maintain lists of selected peers in managed groups
 
-    def __init__(self, dev, mode=None, **kwargs):
+    def __init__(self, device, mode=None, **kwargs):
         self.__selected_peers = dict()
-        super().__init__(dev, mode, **kwargs)
+        super().__init__(device, mode, **kwargs)
 
     def initiate_group(self, group_name, force=False):
         """Initiate the group from live configuration only if it's not inventoried yet. Override with force=True"""
         if group_name not in self.__selected_peers or force:
             # Get the list of neighbors in the group
-            filter = f"<configuration><groups><name>MESHRR</name><protocols><bgp><group><name>{group_name}</name><neighbor><name/></neighbor></group></bgp></protocols></groups></configuration>"
-            data = dev.rpc.get_config(filter_xml=filter)
+            xmlfilter = f"<configuration><groups><name>MESHRR</name><protocols><bgp><group><name>{group_name}</name><neighbor><name/></neighbor></group></bgp></protocols></groups></configuration>"
+            data = dev.rpc.get_config(filter_xml=xmlfilter)
             configured_peers = data.xpath(
                 f"groups/protocols/bgp/group[name='{group_name}']/neighbor/name/text()"
             )
