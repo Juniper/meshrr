@@ -41,11 +41,11 @@ groups {
                     type internal;
                     cluster {{ POD_IP }};
                     allow [ {% for prefix in bgpgroups_subtractive['MESHRR-CLIENTS'].prefixes %}{{ prefix }} {% endfor %}];
-                }{% if UPSTREAM_SERVICE_NAME is not none %}
+                }
                 group MESHRR-UPSTREAM {
                     type internal;
                     export UPSTREAM-OUT;
-                }{% endif %}
+                }
             }
         }
     }
