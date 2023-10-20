@@ -31,6 +31,8 @@
 
 from jnpr.junos import Device
 from jnpr.junos.exception import ConnectTimeoutError,ConnectRefusedError
+
+from datetime import datetime
 from time import sleep
 
 if __name__ == "__main__":
@@ -41,9 +43,9 @@ if __name__ == "__main__":
             dev.open()
             break
         except ConnectTimeoutError:
-            print("connect_wait.py: Connection timed out; retrying.")
+            print(f"[{datetime.now()}]","connect_wait.py: Connection timed out; retrying.")
         except ConnectRefusedError:
-            print("connect_wait.py: Connection refused; retrying.")
+            print(f"[{datetime.now()}]","connect_wait.py: Connection refused; retrying.")
             sleep(1)
     # Create /tmp/connected-to-crpd to inform startup probes
     open("/tmp/connected-to-crpd","x")

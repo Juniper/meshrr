@@ -32,6 +32,7 @@
 from os import getenv
 from random import randrange
 
+from datetime import datetime
 from dns import resolver
 from jnpr.junos import Device
 from jnpr.junos.utils.config import Config
@@ -89,7 +90,7 @@ class ConfigUpdate(Config):
                     bgpgroup['source']['hostname'], "A", search=True
                 )
             except (resolver.NXDOMAIN, resolver.NoAnswer) as err:
-                print(err.msg, f"- Skipping processing of {bgpgroup['name']}.")
+                print(f"[{datetime.now()}]", err.msg, f"Skipping processing of {bgpgroup['name']}.")
                 return
 
             for r in result:
@@ -186,6 +187,6 @@ if __name__ == "__main__":
                 bgpgroup=group
             )
         if cu.diff():
-            print("Writing changes:")
+            print(f"[{datetime.now()}] Peer change detected. Writing changes:")
             cu.pdiff()
             cu.commit()
