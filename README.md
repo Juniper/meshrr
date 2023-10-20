@@ -51,11 +51,11 @@ At this time and in the project's raw form, *meshrr* should not be considered fo
 
 ### Environment Variables
 
-| Variable       | Required? | Description                                                  |
-| -------------- | --------- | ------------------------------------------------------------ |
-| LICENSE_KEY    | Yes       | Range to allow. Currently, this accepts only one CIDR block. Format: `network/mask-length` |
-| POD_IP         | Yes       | The pod's IP address. Must be set by Kubernetes manifest in all pod templates for all meshrr containers. This does not need to be set for the cRPD containers. (`valueFrom: fieldRef: fieldPath: status.podIP`) |
-| UPDATE_SECONDS | No        | Frequency in seconds that `meshrr` container will attempt to update `crpd` container with changes to peers. (Default: 30) |
+| Variable       | Required for        | Optional for | Description                                                  |
+| -------------- | ------------------- | ------------ | ------------------------------------------------------------ |
+| LICENSE_KEY    | meshrr-init         |              | Range to allow. Currently, this accepts only one CIDR block. Format: `network/mask-length` |
+| POD_IP         | meshrr-init, meshrr |              | The pod's IP address. Must be set by Kubernetes manifest in all pod templates for all meshrr containers. This does not need to be set for the cRPD containers. (`valueFrom: fieldRef: fieldPath: status.podIP`) |
+| UPDATE_SECONDS |                     | meshrr       | Frequency in seconds that `meshrr` container will attempt to update `crpd` container with changes to peers. (Default: 30) |
 
 
 ## Containers
