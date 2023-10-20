@@ -1,8 +1,10 @@
 system {
+    /* Required, though use of a variable is optional */
     root-authentication {
         encrypted-password "{{ encrypted_root_pw }}"; ## SECRET-DATA
     }
     login {
+        /* Required for meshrr authentication */
         user meshrr {
             class super-user;
             uid 100;
@@ -15,9 +17,11 @@ system {
     no-compress-configuration-files;
     services {
         netconf {
+            /* Required for meshrr access */
             ssh;
         }
     }
+    /* Required for licensing unless using an alternative approach. */
     license {
         keys {
             key "{{ LICENSE_KEY }}";

@@ -17,95 +17,70 @@ At this time and in the project's raw form, *meshrr* should not be considered fo
 ## Instructions
 
 ### Prerequisites
+
 1. An operational Kubernetes cluster with sufficient resources for the topology you wish to build.
-2. A *private* container registry accessible to your Kubernetes cluster.
-   - You'll need to be logged in to your registry using `docker login` to push the image you'll build.
-   - You'll need to store your registry credentials in a secret in your cluster to pull from this registry. In this project, all examples use a secret named `regcred`. There are a few ways you can do this.
-     1. If you already have a simple means of generating the secret manifest (e.g. using `doctl`), you can do this in one line:
-        ```
-        doctl registry kubernetes-manifest --name regcred | kubectl apply -f -
-        ```
-     2. You can generate the secret manually with all the parameters:
-        ```
-        kubectl create secret docker-registry regcred \
-          --docker-server=<server> --docker-username=<username> \
-          --docker-password=<password> --docker-email=<email>
-        ```
-     3. Any number of [other reasonable approaches](https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/).
+2. The cRPD software. The current tested version is **23.2R1.13**.
+2. A cRPD license for the number of nodes you wish to deploy. At the time of writing, Juniper offers [free trial licenses](https://www.juniper.net/us/en/dm/crpd-trial/). Standard licenses are limited to 16 BGP peers and 4M RIB entries.
 
-3. A cRPD license for the number of nodes you wish to deploy. At the time of writing, Juniper offers [free trial licenses](https://www.juniper.net/us/en/dm/crpd-trial/). Standard licenses are limited to 16 BGP peers and 4M RIB entries.
+### Usage
 
-### Quickstart
-1. (If required) modify [`juniper.conf.j2`](meshrr/juniper.conf.j2)
-2. Build and push your image. **Do not push to a public registry.**
+1. (If required) copy a configuration file template from [`the default templates`](meshrr/defaults/) and edit it to your liking.
 
-    ```bash
-    docker build -t <tag> meshrr
-    docker push <tag>
-    ```
-
-    e.g.
-    ```bash
-    docker build meshrr -t registry.example.com/meshrr/meshrr:latest
-    docker push registry.example.com/meshrr/meshrr:latest
-    ```
-3.  Either:
+2.  Either:
     1. Pick an example topology from [`examples`](examples/) and modify the YAML files as required for your topology. Details for how to use examples and reasonable modifications are below in the [Examples](#Examples) section.
     2. Create your own YAML files if you need a completely custom topology.
-4.  Populate the YAML files with the required information. You will need to, at a minimum, replace the following:
-    1. Names
-      1.  Service
-      2.  Labels (if following the 2regions-hrr example, your regions probably are not in Middle Earth)
+
+3.  Populate the Kubernetes manifest YAML files with the required information. You will need to, at a minimum, replace the following:
+    1. Names of elements
     2. [Environment Variables](#Environment-Variables)
-    3. Licensing mechanism. Examples here currently use a secret mounted as a volume mapped to `/config/license/safenet/junos_sfnt.lic`. This may be appropriate for bundle licenses where it is appropriate to use the same license file for many similar devices in a deployment or daemonset. You can create this using:
+    3. Licensing mechanism. Examples here currently use a secret exposed as an environment variable in the meshrr-init container which will populate the license into the config. This may be appropriate for bundle licenses where it is appropriate to use the same license file for many similar devices in a deployment or daemonset. You can create this using:
       ```
-      kubectl create secret generic crpd-license --from-file=junos_sfnt.lic=<filepath>
+      kubectl create secret generic crpd-license --from-file=crpd-license=<filepath>
       ```
-    4. Custom configuration Jinja2 templates loaded into ConfigMaps and mapped as volumes. See [Examples](#Examples).
-    5. Port mapping IP addresses (`hostIP`). No `hostIP` must be specified for instances only accessible within the cluster. Detailed strategy information to be defined in [Examples](#Examples).
-5.  Apply appropriate labels to the nodes:
+    Note that `<filepath>` must point to a file that contains the singular license line and not an entire license file.
+    4. (If required) Custom configuration Jinja2 templates loaded into ConfigMaps and mapped as volumes. See [Examples](#Examples).
+4.  (If required - e.g., for [2regions-hrr](examples/2regions-hrr/) where only certain nodes should host certain clusters of RRs) Apply appropriate labels to the nodes:
     ```bash
     kubectl label nodes <node> <label1>=<value> <label2>=<value>
     ```
-6.  Apply your configuration:
+5.  Apply your configuration:
     ```bash
     kubectl [-n namespace] apply -f <file1>
     kubectl [-n namespace] apply -f <file2>
     ```
 
 ### Environment Variables
-| Variable              | Required? | Description                                                  |
-| --------------------- | --------- | ------------------------------------------------------------ |
-| POD_IP                | Yes       | The pod's IP address. Should be set by Kubernetes (`valueFrom: fieldRef: fieldPath: status.podIP`) |
-| MESH_SERVICE_NAME     | Yes*      | The name of the mesh service. Set to the name of the headless Kubernetes service used for mesh BGP neighbor discovery. *Usually, a `MESH_SERVICE_NAME` is desirable. However, it may be skipped if there is an `UPSTREAM_SERVICE_NAME` in cases such as unmeshed regions learning routes from upstream HRRs. |
-| UPSTREAM_SERVICE_NAME | No        | The name of the upstream service. Set to the name of the headless Kubernetes service used for upstream BGP neighbor discovery. Defaults to `None`. |
-| KUBE_NAMESPACE        | No        | Optional name of the Kubernetes namespace. Defaults to `default`. |
-| ENCRYPTED_ROOT_PW     | Yes       | Encrypted ($6) root password for cRPD                        |
-| AUTONOMOUS_SYSTEM     | Yes       | ASN for the router.                                          |
-| MESHRR_CLIENTRANGE    | Yes       | Range to allow. Currently, this accepts only one CIDR block. Format: `network/mask-length` |
-| MESHRR_MODE           | No        | `routereflector` or `routeserver`. Defaults to `routereflector`. |
-| MESHRR_ASRANGE        | No        | Range of ASNs to allow for `routeserver` mode. Defaults to `65001-65500` |
-| MESHRR_FAMILY_INET    | No        | `true` or `false`. Defaults to `true`                         |
-| MESHRR_FAMILY_EVPN    | No        | `true` or `false`. Defaults to `false`                        |
-| SERVICE_ROOT_DOMAIN   | No        | Defaults to `svc.cluster.local`. You probably don't need to change this. |
 
-## Methodology
-- Build container image based on crpd.
-    - Requires additional packages installed via `apt-get`:
-      - cron
-      - python3
-    - Builds crontab
-    - Sets up `runit-init.sh`
-- `runit-init.sh` initializes the environment:
-  - Saves environment variables, including the necessary pod's IP address, to `/etc/envvars`
-  - Sets up the cRPD configuration based on the template `juniper.conf.template`
-  - Calls `render_config.py` to create configuration file from Jinja2 template.
-- `update_peers.py` called every minute via cron.
-  - Uses a Kubernetes headless service DNS A records to detect peers.
+| Variable       | Required? | Description                                                  |
+| -------------- | --------- | ------------------------------------------------------------ |
+| LICENSE_KEY    | Yes       | Range to allow. Currently, this accepts only one CIDR block. Format: `network/mask-length` |
+| POD_IP         | Yes       | The pod's IP address. Must be set by Kubernetes manifest in all pod templates for all meshrr containers. This does not need to be set for the cRPD containers. (`valueFrom: fieldRef: fieldPath: status.podIP`) |
+| UPDATE_SECONDS | No        | Frequency in seconds that `meshrr` container will attempt to update `crpd` container with changes to peers. (Default: 30) |
+
+
+## Containers
+
+- Init Container - `meshrr-init`:
+  - `run.sh` with arg `init`
+  - Creates configuration from default template or mounted template or derives from existing `/config/juniper.conf` if pod uses persistent storage.
+- Container - `crpd`:
+  - Unmodified cRPD image running Juniper cRPD.
+- Container - `meshrr`:
+  - Conducts periodic BGP peer configuration changes on `crpd` container via Netconf.
+
+## BGP Group Types
+
+- `mesh`
+  - Discovers peers and connects to all or a limited number of them.
+  - Currently, the only BGP peer discovery mode is `dns`, which uses a Kubernetes headless service DNS A records to detect peers.
   New peers are added to config, removed peers are removed from config.
-  - Only occurs once a minute, so, given BGP timers, assume pod readiness 100 seconds from initiation.
+  - Supports a `max_peers` setting, which limits the number of peers added in this group. This is suitable for connections to a higher tier in a hierarchical route reflector / route server topology.
+- `subtractive`
+  - This can be seen as a "wildcard". This is suitable for an environment in which not all peers are strictly defined and uses Junos BGP group `allow` config to permit connections from a range.
+  - The `allow` config is dynamically generated based on the list of all prefixes in the meshrr configuration with all peers from any mesh groups removed.
 
 ## Examples
+
 - [2regions-hrr](examples/2regions-hrr)
   - Hierarchicial route reflectors broken into two regions with a single core region unifying them.
   - Reachability via static routes and Kubernetes NodeIP Services referencing additional loopbacks on the Kubernetes nodes.
