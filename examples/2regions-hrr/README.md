@@ -26,15 +26,12 @@
 
 
 ### Usage
-1.  Follow the instructions in [Quickstart](../../README.md#Quickstart) using the example YAML files in [examples/2regions-hrr](.).
-
-2.  Create the necessary loopback IPs on each of the nodes based on redundancy group and region. Internal-only MESHRR_REGIONs do not require a configured loopback IP.
-
-    ```bash
-    sudo ip address add 172.19.1.1 dev lo
+1.  Review the instructions in [the project's main README](../../README.md#Usage). Create a license secret:
+    ```
+    kubectl create secret generic crpd-license --from-file=crpd-license=<filepath>
     ```
 
-3.  Configure the routers connected to the nodes with:
+2.  Configure the routers connected to the nodes with:
     *  The anycast peering address for MetalLB to peer to on the loopback
     *  Hardcoded router ID (to ensure that the anycast peering address does not become the router ID)
     *  BGP peering
@@ -57,7 +54,7 @@
     set policy-options policy-statement REDISTRIBUTE-RRS then accept
     ```
 
-4.  Modify configuration templates as necessary. [`meshrr/juniper.conf.j2`](../../meshrr/defaults/juniper-ipv4rr.conf.j2) will be loaded to all instances by default, but customizations on a per-deployment/per-daemonset basis should be performed in most cases files (see [`core-config.j2`](templates/core-config.j2), [`mirkwood-config.j2`](templates/mirkwood-config.j2), and [`lothlorien-config.j2`](templates/lothlorien-config.j2).
+3.  Modify configuration templates as necessary. [`meshrr/juniper.conf.j2`](../../meshrr/defaults/juniper-ipv4rr.conf.j2) will be loaded to all instances by default, but customizations on a per-deployment/per-daemonset basis should be performed in most cases files (see [`core-config.j2`](templates/core-config.j2), [`mirkwood-config.j2`](templates/mirkwood-config.j2), and [`lothlorien-config.j2`](templates/lothlorien-config.j2).
 Apply these configuration templates as ConfigSets for any cases that require customization as so:
 
     ```bash
@@ -83,7 +80,7 @@ Apply these configuration templates as ConfigSets for any cases that require cus
 
     These ConfigMaps are mounted as volumes in the corresponding Deployments/DaemonSets.
 
-5.  Label the nodes. You may need to adjust the node names.
+4.  Label the nodes. You may need to adjust the node names.
     ```bash
     kubectl label nodes lothlorien-vm1 meshrr_region_core="true" meshrr_region_lothlorien="true" redundancy_group=a
     kubectl label nodes lothlorien-vm2 meshrr_region_core="true" meshrr_region_lothlorien="true" redundancy_group=b
@@ -93,7 +90,24 @@ Apply these configuration templates as ConfigSets for any cases that require cus
     kubectl label nodes mirkwood-vm2 meshrr_region_mirkwood="true" redundancy_group=b
     ```
 
-6.  Apply the Kubernetes manifests:
+5.  Apply the Kubernetes manifests:
     ```bash
     k apply -f bgppeer-global.yml meshrr-core.yaml meshrr-lothlorien.yaml meshrr-mirkwood.yaml
     ```
+
+    See [Manifests and Objects Used](#Manifests-and-Objects-Used) for detail on what this does.
+
+### Manifests and Objects Used
+
+* [`bgppeer-global.yml`]()
+  * `BGPPeer/asn65000-global-lo1`: Defines a single BGP peer that will be used from every node in the Kubernetes cluster out every interface. In this example, we use 10.0.0.0/32 as an anycast IP on every router that connects to the Kubernetes cluster. This must not be advertised in any routing protocol.
+* [`meshrr-core.yaml`]()
+  * `ConfigMap/meshrr-core-conf`: Contains the YAML to configure meshrr for the Core Deployment.
+  * `Service/meshrr-core`: Headless service used for inter-pod BGP service discovery.
+  * `Deployment/meshrr-core`: Defines the Deployment for the meshrr Core region.
+* [`meshrr-lothlorien.yaml`]() and [`meshrr-mirkwood.yaml`]()
+  * `ConfigMap/meshrr-<REGION>-conf`: Contains the YAML to configure meshrr for both the <REGION> DaemonSets.
+  * `IPAddressPool/meshrr-<REGION>`: The address pool used for both the A side and B side load balancers in <REGION>.
+  * `BGPAdvertisement/meshrr-<REGION>`: Configures MetalLB to advertise the load balancer addresses when a pod is reachable via a LoadBalancer service on the node.
+  * `Service/meshrr-<REGION>-<RG>`: Configures a MetalLB LoadBalancer to connect external route reflector clients to a containerized route reflector in redundancy group <RG>. Note that `externalTrafficPolicy: Local` is of importance here to ensure that traffic to the service does not traverse the Kubernetes cluster to reach a Pod but only is advertised via BGP if a pod in the service exists on the node.
+  * `DaemonSet/meshrr-<REGION>-<RG>`: The DaemonSet for the redundancy group <RG> nodes in  <REGION>. Note the use of DaemonSets vs Deployments: Deployments ensure that a certain number of pods exist within the cluster. DaemonSets ensure that a pod exists on each node within the cluster that matches the parameters defined in `nodeAffinity`.
