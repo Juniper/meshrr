@@ -14,6 +14,7 @@ At this time and in the project's raw form, *meshrr* should not be considered fo
   - [Containers](#containers)
   - [BGP Group Types](#bgp-group-types)
   - [Examples](#examples)
+  - [Example Commands](#example-commands)
 
 ## Instructions
 
@@ -88,3 +89,17 @@ At this time and in the project's raw form, *meshrr* should not be considered fo
 - [load-balanced-route-servers](examples/load-balanced-route-servers)
   - EVPN route servers deployed in a full iBGP mesh with each other serving eBGP peers. Intended to scale DCI for multi-region deployment.
   - Reachability for external devices achieved through use of MetalLB in BGP mode.
+
+## Example Commands
+
+| Command                                                      | Description                                                  |
+| ------------------------------------------------------------ | ------------------------------------------------------------ |
+| `kubectl [-n NAMESPACE] get pods -o wide`                    | List pods and the nodes on which they run                    |
+| `kubectl [-n NAMESPACE] exec -it POD -c crpd -- cli`         | Access the CLI of cRPD                                       |
+| `kubectl [-n NAMESPACE] exec POD -c crpd -- cli show bgp summary` | See the `show bgp summary` output of a pod                   |
+| `kubectl [-n NAMESPACE] exec POD -c crpd -- cli show bgp group summary \|except \"Allow\|orlonger\|^Default\|^$\"` | See the status of the neighbor groups of a pod               |
+| `kubectl [-n NAMESPACE] logs [-f] POD -c meshrr`             | View the logs from the meshrr sidecar container. `-f` will follow the logs. |
+| `kubectl [-n NAMESPACE] delete pod POD`                      | Delete POD. Because pods should be created by DaemonSet, StatefulSet, or Deployment, a new pod should be recreated in its place; in this context, this may be considered functionally more similar to a "restart" than to a "delete". |
+
+
+

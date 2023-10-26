@@ -7,7 +7,7 @@
 * Within a region, all cRPDs are fully meshed via iBGP to provide maximum visibility within the region.
 * All cRPDs in a region other than `core` have BGP peerings with up to 2 `core` cRPDs. The `core` cRPDs serve as route reflectors for the non-core regions. (The limit of 2 is hard coded on upstream peer groups.)
 * **Redundancy groups and anycast addressing:**
-  * Each node is assigned to redundancy group `a` or `b`.
+  * Each node is assigned to redundancy group `a` or `b`. (In a production environment, two separate Kubernetes clusters may be desirable.)
   * For each region with neighbors outside the cluster, separate DaemonSets are created for `a` and `b`, each with a unique IP address for that [meshrr_region:redundancy_group] combination. This IP address is used for iBGP peering with neighbors outside the cluster.
   * Kubernetes nodes run MetalLB.
   * MetalLB eBGP peers to each connected router on a loopback with the same IP address (10.0.0.0).
@@ -54,28 +54,21 @@
     set policy-options policy-statement REDISTRIBUTE-RRS then accept
     ```
 
-3.  Modify configuration templates as necessary. [`meshrr/juniper.conf.j2`](../../meshrr/defaults/juniper-ipv4rr.conf.j2) will be loaded to all instances by default, but customizations on a per-deployment/per-daemonset basis should be performed in most cases files (see [`core-config.j2`](templates/core-config.j2), [`mirkwood-config.j2`](templates/mirkwood-config.j2), and [`lothlorien-config.j2`](templates/lothlorien-config.j2).
+3.  Modify configuration templates as necessary. [`meshrr/juniper.conf.j2`](../../meshrr/defaults/juniper-ipv4rr.conf.j2) will be loaded to all instances by default, but customizations on a per-deployment/per-daemonset basis should be performed in most cases files (see [`mirkwood-config.j2`](templates/mirkwood-config.j2) and [`lothlorien-config.j2`](templates/lothlorien-config.j2)).
 Apply these configuration templates as ConfigSets for any cases that require customization as so:
 
     ```bash
-    k create configmap core-config \
-      --from-file=config=examples/2regions-hrr/templates/core-config.j2 \
-      -o yaml --dry-run=client |
-      k apply -f -
-    ```
-
-    ```bash
-    k create configmap mirkwood-config \
+    kubectl create configmap mirkwood-config \
       --from-file=config=examples/2regions-hrr/templates/mirkwood-config.j2 \
       -o yaml --dry-run=client |
-      k apply -f -
+      kubectl apply -f -
     ```
 
     ```bash
-    k create configmap lothlorien-config \
+    kubectl create configmap lothlorien-config \
       --from-file=config=examples/2regions-hrr/templates/lothlorien-config.j2 \
       -o yaml --dry-run=client |
-      k apply -f -
+      kubectl apply -f -
     ```
 
     These ConfigMaps are mounted as volumes in the corresponding Deployments/DaemonSets.
@@ -92,7 +85,7 @@ Apply these configuration templates as ConfigSets for any cases that require cus
 
 5.  Apply the Kubernetes manifests:
     ```bash
-    k apply -f bgppeer-global.yml meshrr-core.yaml meshrr-lothlorien.yaml meshrr-mirkwood.yaml
+    k apply -f examples/2regions-hrr/bgppeer-global.yml -f examples/2regions-hrr/meshrr-core.yaml -f examples/2regions-hrr/meshrr-lothlorien.yaml -f examples/2regions-hrr/meshrr-mirkwood.yaml
     ```
 
     See [Manifests and Objects Used](#Manifests-and-Objects-Used) for detail on what this does.
