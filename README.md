@@ -21,8 +21,14 @@ At this time and in the project's raw form, *meshrr* should not be considered fo
 ### Prerequisites
 
 1. An operational Kubernetes cluster with sufficient resources for the topology you wish to build.
-2. The cRPD software. The current tested version is **23.2R1.13**.
-2. A cRPD license for the number of nodes you wish to deploy. At the time of writing, Juniper offers [free trial licenses](https://www.juniper.net/us/en/dm/crpd-trial/). Standard licenses are limited to 16 BGP peers and 4M RIB entries.
+2. The cRPD software. The current tested version is **23.2R1.13**. The software must be available via a private repository or preloaded onto all nodes it may be run on. If using k3s, this can be accomplished with `k3s ctr images import junos-routing-crpd-docker-amd64-23.2R1.13.tar`.
+   - If the import fails, you may need to convert the tarfile into a format that can be imported. You can do so with
+     ```sh
+     docker load -i junos-routing-crpd-docker-amd64-23.2R1.13.tgz \
+      && docker image tag crpd:23.2R1.13 localhost/juniper/crpd:23.2R1.13 \
+      && docker image save localhost/juniper/crpd:23.2R1.13 --output=junos-routing-crpd-docker-amd64-23.2R1.13.tar 
+     ```
+3. A cRPD license for the number of nodes you wish to deploy. At the time of writing, Juniper offers [free trial licenses](https://www.juniper.net/us/en/dm/crpd-trial/). Standard licenses are limited to 16 BGP peers and 4M RIB entries.
 
 ### Usage
 
