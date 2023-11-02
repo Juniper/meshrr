@@ -56,7 +56,6 @@ groups {
                         }
                         no-install;
                     }
-                }
                 }{%- for bgpgroup in bgpgroups_mesh %}
                 /* Mesh {% if bgpgroups_mesh[bgpgroup].max_peers is defined %}max_peers:{{ bgpgroups_mesh[bgpgroup].max_peers }} {% endif %}group from {{ bgpgroups_mesh[bgpgroup].source.sourcetype }}:{{ bgpgroups_mesh[bgpgroup].source.hostname }} */
                 group {{ bgpgroup }} {
