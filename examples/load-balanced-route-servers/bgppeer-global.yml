@@ -1,10 +1,10 @@
 apiVersion: metallb.io/v1beta2
 kind: BGPPeer
 metadata:
-  name: asn100-global-lo100
+  name: global-lo1
   namespace: metallb
 spec:
-  myASN: 65000
-  peerASN: 100
-  peerAddress: 10.0.0.0
-
+  myASN: 4259840003
+  peerASN: 4259840002
+  peerAddress: 192.168.255.0
+  ebgpMultiHop: True
