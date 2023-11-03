@@ -1,0 +1,513 @@
+---
+apiVersion: v1
+data:
+  config: |
+    system {
+        root-authentication {
+            encrypted-password "{{ encrypted_root_pw }}"; ## SECRET-DATA
+        }
+        login {
+            user meshrr {
+                class super-user;
+                uid 100;
+                authentication {
+                    ssh-ed25519 "ssh-ed25519 TBD"; ## SECRET-DATA
+                }
+            }
+        }
+        services {
+            netconf {
+                ssh;
+            }
+        }
+        license {
+            keys {
+                key "{{ LICENSE_KEY }}";
+            }
+        }
+        processes {
+            routing {
+                bgp {
+                    rib-sharding;
+                    update-threading;
+                }
+            }
+        }
+    }
+    groups {
+        MESHRR {
+            protocols {
+                bgp {
+                    group MESHRR-MESH {
+                        type internal
+                    }
+                    group MESHRR-FULLTABLE-CLIENTS {
+                        type internal;
+                        passive;
+                        cluster {{ POD_IP }};
+                    }
+                    group MESHRR-PARTIALTABLE-CLIENTS {
+                        type internal;
+                        passive;
+                        export PARTIALTABLE-OUT;
+                        cluster {{ POD_IP }};
+                    }
+                    group MESHRR-DEFAULTONLY-CLIENTS {
+                        type internal;
+                        passive;
+                        export DEFAULTONLY-OUT;
+                        cluster {{ POD_IP }};
+                    }
+                }
+            }
+        }
+    }
+    policy-options {
+        policy-statement DEFAULTONLY-OUT {
+            from {
+                route-filter 0.0.0.0/0 exact;
+            }
+            then accept;
+        }
+        policy-statement PARTIALTABLE-OUT {
+            from {
+                as-path-calc-length 0 orlower;
+            }
+            then accept;
+        }
+        policy-statement UPSTREAM-OUT {
+            term DROP-INREGION-ONLY {
+                from community INREGION-ONLY;
+                then reject;
+            }
+            term INREGION-PREFERRED {
+                from community INREGION-PREFERRED;
+                then {
+                    local-preference 20;
+                }
+            }
+            then accept;
+        }
+        community INREGION-ONLY members 65000:101;
+        community INREGION-PREFERRED members 65000:102;
+    }
+    routing-options {
+        autonomous-system {{ asn }};
+        router-id {{ POD_IP }};
+    }
+    protocols {
+        bgp {
+            apply-groups MESHRR;
+            family inet {
+                unicast {
+                    nexthop-resolution {
+                        no-resolution;
+                    }
+                    no-install;
+                }
+            }
+        }
+    }
+kind: ConfigMap
+metadata:
+  creationTimestamp: null
+  name: 3clientgroups-config
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: meshrr-3clientgroups-conf
+data:
+  meshrr.conf.yml: |+
+    encrypted_root_pw: NOLOGIN
+    asn: "65000"
+    mode: ipv4rr
+    bgpgroups:
+    - name: MESHRR-MESH
+      type: mesh
+      source:
+        sourcetype: dns
+        hostname: meshrr-3clientgroups
+    - name: MESHRR-FULLTABLE-CLIENTS
+      type: mesh
+      source:
+        sourcetype: dns
+        hostname: meshrr-fulltable-clients
+    - name: MESHRR-PARTIALTABLE-CLIENTS
+      type: mesh
+      source:
+        sourcetype: dns
+        hostname: meshrr-partialtable-clients
+    - name: MESHRR-DEFAULTONLY-CLIENTS
+      type: mesh
+      source:
+        sourcetype: dns
+        hostname: meshrr-defaultonly-clients
+---
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: meshrr-3clientgroups
+  namespace: metallb
+spec:
+  addresses:
+  - 172.19.1.1/32
+  - 172.19.1.2/32
+  autoAssign: false
+---
+apiVersion: metallb.io/v1beta1
+kind: BGPAdvertisement
+metadata:
+  name: meshrr-3clientgroups
+  namespace: metallb
+spec:
+  ipAddressPools:
+  - meshrr-3clientgroups
+---
+apiVersion: v1
+kind: Service
+metadata:
+  creationTimestamp: null
+  name: meshrr-3clientgroups-a
+  annotations:
+    metallb.universe.tf/address-pool: meshrr-3clientgroups
+spec:
+  ports:
+  - name: bgp
+    port: 179
+    protocol: TCP
+    targetPort: bgp
+  selector:
+    app: meshrr
+    redundancy_group: a
+  sessionAffinity: None
+  type: LoadBalancer
+  loadBalancerIP: 172.19.1.1
+  externalTrafficPolicy: Local
+status:
+  loadBalancer: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  creationTimestamp: null
+  name: meshrr-3clientgroups-b
+  annotations:
+    metallb.universe.tf/address-pool: meshrr-3clientgroups
+spec:
+  ports:
+  - name: bgp
+    port: 179
+    protocol: TCP
+    targetPort: bgp
+  selector:
+    app: meshrr
+    redundancy_group: b
+  sessionAffinity: None
+  type: LoadBalancer
+  loadBalancerIP: 172.19.1.2
+  externalTrafficPolicy: Local
+status:
+  loadBalancer: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  creationTimestamp: null
+  name: meshrr-3clientgroups
+spec:
+  clusterIP: None
+  ports:
+  - name: bgp
+    port: 179
+    protocol: TCP
+    targetPort: bgp
+  selector:
+    app: meshrr
+  sessionAffinity: None
+  type: ClusterIP
+status:
+  loadBalancer: {}
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: meshrr-3clientgroups-a
+  labels:
+    app: meshrr
+    redundancy_group: a
+spec:
+  selector:
+    matchLabels:
+      app: meshrr
+  minReadySeconds: 5
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+  template:
+    metadata:
+      labels:
+        app: meshrr
+        redundancy_group: a
+    spec:
+      dnsPolicy: ClusterFirst
+      terminationGracePeriodSeconds: 30
+      volumes:
+        - name: config
+          emptyDir: {}
+        - name: ssh-id
+          emptyDir: {}
+        - name: meshrr-conf
+          configMap:
+            defaultMode: 256
+            items:
+            - key: meshrr.conf.yml
+              mode: 256
+              path: meshrr.conf.yml
+            name: meshrr-3clientgroups-conf
+            optional: false
+        - configMap:
+            defaultMode: 256
+            items:
+            - key: config
+              mode: 256
+              path: juniper.conf.j2
+            name: 3clientgroups-config
+            optional: false
+          name: override-config
+      initContainers:
+        - name: meshrr-init
+          image: ghcr.io/juniper/meshrr:next
+          imagePullPolicy: IfNotPresent
+          args: ["init"]
+          volumeMounts:
+            - name: ssh-id
+              mountPath: /secret/ssh/
+            - name: config
+              mountPath: /config/
+            - name: meshrr-conf
+              mountPath: /opt/meshrr/conf/meshrr.conf.yml
+              readOnly: true
+              subPath: meshrr.conf.yml
+            - mountPath: /opt/meshrr/conf/juniper.conf.j2
+              name: override-config
+              readOnly: true
+              subPath: juniper.conf.j2
+          env:
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: LICENSE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: crpd-license
+                  key: crpd-license
+      containers:
+        - name: crpd
+          image: localhost/juniper/crpd:23.2R1.13
+          imagePullPolicy: Never
+          livenessProbe:
+            failureThreshold: 3
+            initialDelaySeconds: 15
+            periodSeconds: 2
+            successThreshold: 1
+            tcpSocket:
+              port: bgp
+            timeoutSeconds: 3
+          readinessProbe:
+            failureThreshold: 3
+            initialDelaySeconds: 5
+            periodSeconds: 2
+            successThreshold: 2
+            tcpSocket:
+              port: bgp
+            timeoutSeconds: 3
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          ports:
+            - name: bgp
+              containerPort: 179
+              protocol: TCP
+          volumeMounts:
+            - name: config
+              mountPath: /config/
+          securityContext:
+            allowPrivilegeEscalation: true
+            privileged: true
+            runAsNonRoot: false
+        - name: meshrr
+          image: ghcr.io/juniper/meshrr:next
+          imagePullPolicy: IfNotPresent
+          args: ["sidecar"]
+          startupProbe:
+            exec:
+              command:
+              - cat
+              - /tmp/connected-to-crpd
+            initialDelaySeconds: 5
+            periodSeconds: 3
+          volumeMounts:
+            - name: ssh-id
+              mountPath: /secret/ssh/
+            - name: meshrr-conf
+              mountPath: /opt/meshrr/conf/meshrr.conf.yml
+              readOnly: true
+              subPath: meshrr.conf.yml
+          env:
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: redundancy_group
+                    operator: In
+                    values:
+                      - a
+
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: meshrr-3clientgroups-b
+  labels:
+    app: meshrr
+    redundancy_group: b
+spec:
+  selector:
+    matchLabels:
+      app: meshrr
+  minReadySeconds: 5
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+  template:
+    metadata:
+      labels:
+        app: meshrr
+        redundancy_group: b
+    spec:
+      dnsPolicy: ClusterFirst
+      terminationGracePeriodSeconds: 30
+      volumes:
+        - name: config
+          emptyDir: {}
+        - name: ssh-id
+          emptyDir: {}
+        - name: meshrr-conf
+          configMap:
+            defaultMode: 256
+            items:
+            - key: meshrr.conf.yml
+              mode: 256
+              path: meshrr.conf.yml
+            name: meshrr-3clientgroups-conf
+            optional: false
+        - configMap:
+            defaultMode: 256
+            items:
+            - key: config
+              mode: 256
+              path: juniper.conf.j2
+            name: 3clientgroups-config
+            optional: false
+          name: override-config
+      initContainers:
+        - name: meshrr-init
+          image: ghcr.io/juniper/meshrr:next
+          imagePullPolicy: IfNotPresent
+          args: ["init"]
+          volumeMounts:
+            - name: ssh-id
+              mountPath: /secret/ssh/
+            - name: config
+              mountPath: /config/
+            - name: meshrr-conf
+              mountPath: /opt/meshrr/conf/meshrr.conf.yml
+              readOnly: true
+              subPath: meshrr.conf.yml
+            - mountPath: /opt/meshrr/conf/juniper.conf.j2
+              name: override-config
+              readOnly: true
+              subPath: juniper.conf.j2
+          env:
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: LICENSE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: crpd-license
+                  key: crpd-license
+      containers:
+        - name: crpd
+          image: localhost/juniper/crpd:23.2R1.13
+          imagePullPolicy: Never
+          livenessProbe:
+            failureThreshold: 3
+            initialDelaySeconds: 15
+            periodSeconds: 2
+            successThreshold: 1
+            tcpSocket:
+              port: bgp
+            timeoutSeconds: 3
+          readinessProbe:
+            failureThreshold: 3
+            initialDelaySeconds: 5
+            periodSeconds: 2
+            successThreshold: 2
+            tcpSocket:
+              port: bgp
+            timeoutSeconds: 3
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          ports:
+            - name: bgp
+              containerPort: 179
+              protocol: TCP
+          volumeMounts:
+            - name: config
+              mountPath: /config/
+          securityContext:
+            allowPrivilegeEscalation: true
+            privileged: true
+            runAsNonRoot: false
+        - name: meshrr
+          image: ghcr.io/juniper/meshrr:next
+          imagePullPolicy: IfNotPresent
+          args: ["sidecar"]
+          startupProbe:
+            exec:
+              command:
+              - cat
+              - /tmp/connected-to-crpd
+            initialDelaySeconds: 5
+            periodSeconds: 3
+          volumeMounts:
+            - name: ssh-id
+              mountPath: /secret/ssh/
+            - name: meshrr-conf
+              mountPath: /opt/meshrr/conf/meshrr.conf.yml
+              readOnly: true
+              subPath: meshrr.conf.yml
+          env:
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: redundancy_group
+                    operator: In
+                    values:
+                      - b
