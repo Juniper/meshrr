@@ -3,10 +3,12 @@ apiVersion: v1
 data:
   config: |
     system {
+        /* Required, though use of a variable is optional */
         root-authentication {
             encrypted-password "{{ encrypted_root_pw }}"; ## SECRET-DATA
         }
         login {
+            /* Required for meshrr authentication */
             user meshrr {
                 class super-user;
                 uid 100;
@@ -20,6 +22,7 @@ data:
                 ssh;
             }
         }
+        /* Required for licensing unless using an alternative approach. */
         license {
             keys {
                 key "{{ LICENSE_KEY }}";
@@ -38,20 +41,24 @@ data:
         MESHRR {
             protocols {
                 bgp {
+                    /* Mesh {% if bgpgroups_mesh['MESHRR-MESH'].max_peers is defined %}max_peers:{{ bgpgroups_mesh['MESHRR-MESH'].max_peers }} {% endif %}group from {{ bgpgroups_mesh['MESHRR-MESH'].source.sourcetype }}:{{ bgpgroups_mesh['MESHRR-MESH'].source.hostname }} */
                     group MESHRR-MESH {
                         type internal
                     }
+                    /* Mesh {% if bgpgroups_mesh['MESHRR-FULLTABLE-CLIENTS'].max_peers is defined %}max_peers:{{ bgpgroups_mesh['MESHRR-FULLTABLE-CLIENTS'].max_peers }} {% endif %}group from {{ bgpgroups_mesh['MESHRR-FULLTABLE-CLIENTS'].source.sourcetype }}:{{ bgpgroups_mesh['MESHRR-FULLTABLE-CLIENTS'].source.hostname }} */
                     group MESHRR-FULLTABLE-CLIENTS {
                         type internal;
                         passive;
                         cluster {{ POD_IP }};
                     }
+                    /* Mesh {% if bgpgroups_mesh['MESHRR-PARTIALTABLE-CLIENTS'].max_peers is defined %}max_peers:{{ bgpgroups_mesh['MESHRR-PARTIALTABLE-CLIENTS'].max_peers }} {% endif %}group from {{ bgpgroups_mesh['MESHRR-PARTIALTABLE-CLIENTS'].source.sourcetype }}:{{ bgpgroups_mesh['MESHRR-PARTIALTABLE-CLIENTS'].source.hostname }} */
                     group MESHRR-PARTIALTABLE-CLIENTS {
                         type internal;
                         passive;
                         export PARTIALTABLE-OUT;
                         cluster {{ POD_IP }};
                     }
+                    /* Mesh {% if bgpgroups_mesh['MESHRR-DEFAULTONLY-CLIENTS'].max_peers is defined %}max_peers:{{ bgpgroups_mesh['MESHRR-DEFAULTONLY-CLIENTS'].max_peers }} {% endif %}group from {{ bgpgroups_mesh['MESHRR-DEFAULTONLY-CLIENTS'].source.sourcetype }}:{{ bgpgroups_mesh['MESHRR-DEFAULTONLY-CLIENTS'].source.hostname }} */
                     group MESHRR-DEFAULTONLY-CLIENTS {
                         type internal;
                         passive;
@@ -70,26 +77,19 @@ data:
             then accept;
         }
         policy-statement PARTIALTABLE-OUT {
-            from {
-                as-path-calc-length 0 orlower;
-            }
-            then accept;
-        }
-        policy-statement UPSTREAM-OUT {
-            term DROP-INREGION-ONLY {
-                from community INREGION-ONLY;
-                then reject;
-            }
-            term INREGION-PREFERRED {
-                from community INREGION-PREFERRED;
-                then {
-                    local-preference 20;
+            term SAME-AS {
+                from {
+                    as-path-calc-length 0 orlower;
                 }
+                then accept;
             }
-            then accept;
+            term DEFAULT {
+                from {
+                    route-filter 0.0.0.0/0 exact;
+                }
+                then accept;
+            }
         }
-        community INREGION-ONLY members 65000:101;
-        community INREGION-PREFERRED members 65000:102;
     }
     routing-options {
         autonomous-system {{ asn }};
