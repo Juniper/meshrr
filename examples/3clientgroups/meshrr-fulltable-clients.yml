@@ -1,0 +1,25 @@
+---
+kind: "Service"
+apiVersion: "v1"
+metadata:
+  name: "meshrr-fulltable-clients"
+spec:
+  clusterIP: None
+  ports:
+    - name: "bgp"
+      protocol: "TCP"
+      port: 179
+      targetPort: 179
+---
+kind: "Endpoints"
+apiVersion: "v1"
+metadata:
+  name: "meshrr-fulltable-clients" 
+subsets: 
+  - addresses:
+      - ip: "1.2.3.4"
+      - ip: "4.5.6.7"
+    ports:
+      -
+        port: 179
+        name: "bgp"
