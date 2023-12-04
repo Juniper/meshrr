@@ -1,15 +1,13 @@
 # Example: Fully-meshed Multi-region Route Servers
 
 ## Description
-* This topology has two regions, `1` and `2`.
 * cRPD is used as route servers for EVPN connectivity to minimize peering requirements in a many-DC environment.
-* The two regions have route servers fully meshed together.
-* Route servers, and Kubernetes nodes, are defined as "a" or "b" side.
-* These route servers are deployed as StatefulSets for configuration persistence.
+* Route servers, and Kubernetes nodes, are defined as "a" or "b" side. In this example, they exist within a single Kubernetes cluster using labels to differentiate between nodes. However, it is feasible to structure this with two entirely separate Kubernetes clusters.
+* These route servers are deployed as StatefulSets; these could be used to provide for configuration persistence but do not in this example.
 * **Redundancy groups and anycast addressing:**
   * Each node is assigned to redundancy group ("side") `a` or `b`.
-  * cRPD pods are scheduled via StatefulSets, and will only be scheduled on a node of their appropriate side. They will prefer to be scheduled on a node of their region. With minor modification to the manifest, backup region(s) can be configured to avoid them being scheduled to just any side-compliant node.
-  * In this example, the same IP address is configured as a loopback on each device connecting to a k8s node. This enables to use of only one MetalLB `BGPPeer` manifest globally.
+  * cRPD pods are scheduled via StatefulSets, and will only be scheduled on a node of their appropriate side.
+  * In this example, the same IP address is configured as a loopback on each device connecting to a k8s node. Serving as an anycast address, this enables to use of only one MetalLB `BGPPeer` manifest globally.
   * MetalLB is used to provide external addressing for BGP connectivity to the cRPD route servers, as well as load balancing if the StatefulSet's `replicas` setting is greater than 1 (or multiple deployments provide endpoints for the same service).
   * MetalLB is also used in this example to provide external addressing for traditional management connectivity (SSH) to the cRPD route servers.
   * `LoadBalancer` services use a `Local` `externalTrafficPolicy`. This is important to ensure that:
@@ -17,12 +15,7 @@
     * cRPD's view of the peer shows the physical router's peering IP address (not critical for function but important for operational clarity)
 
 ## Requirements
-* Kubernetes environment with at least two nodes (one `side=a` and one `side=b`) and with coredns active. For this example, we used microk8s.
-* Available storage class. Longhorn was used for this example:
-  ```zsh
-  helm repo add longhorn https://charts.longhorn.io
-  helm install longhorn longhorn/longhorn --namespace longhorn-system --create-namespace --version 1.4.0 --set defaultSettings.defaultDataPath="/longhorn" --set csi.kubeletRootDir="/var/snap/microk8s/common/var/lib/kubelet"
-  ```
+* Kubernetes environment with at least two nodes (one `side=a` and one `side=b`) and with coredns active. This example has been tested on k3s.
 * MetalLB:
   ```zsh
   helm repo add metallb https://metallb.github.io/metallb
@@ -40,7 +33,74 @@
    
     Configuration on the router may look like:
 
-    ##### Junos
+    ##### Junos - If RS is in a DC fabric
+    ```junos
+    interfaces {
+      lo0 {
+        unit 0 {
+          family inet {
+            # Primary loopback address
+            address 192.168.1.3/32 {
+              primary;
+              preferred;
+            }
+            # MetalLB Anycast Peer
+            address 192.168.255.0/32/32;
+          }
+        }
+      }
+      ge-0/0/2 {
+        description "meshrr-kube1 eth1";
+        unit 0 {
+          family inet {
+            address 172.16.1.12/31
+          }
+        }
+      }
+    }
+    policy-options {
+      policy-statement ADVERTISE-LOOPBACKS {
+        term DENY-MESHRR-LB {
+          from {
+            route-filter 192.168.255.0/32 exact;
+          }
+          then reject;
+        }
+        from {
+          family inet;
+          protocol direct;
+          interface lo0.0;
+        }
+        then accept;
+      }
+      policy-statement ADVERTISE-MESHRR {
+        from {
+          family inet;
+          protocol direct;
+          interface ge-0/0/2.0;
+        }
+        then accept;
+      }
+    }
+    protocols {
+      bgp {
+        group MESHRR-LB {
+            type external;
+            local-address 192.168.255.0;
+            ttl 1;
+            family inet {
+                unicast;
+            }
+            peer-as 65000.3;
+            local-as 65000.2 private;
+            allow 172.16.0.0/16;        
+        }
+        export [ ADVERTISE-LOOPBACKS ADVERTISE-MESHRR ];
+      }
+    }
+    ```
+
+    ##### Junos - If RS is on the MPLS network in a VRF
     ```junos
     interfaces lo0 {
       unit 100 {
@@ -70,7 +130,7 @@
     }
     ```
 
-    ##### IOS-XR
+    ##### IOS-XR - If RS is on the MPLS network in a VRF
     ```ios-xr
     interface Loopback100
      vrf DCI
