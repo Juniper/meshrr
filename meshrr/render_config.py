@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright (c) Juniper Networks, Inc., 2020. All rights reserved.
+# Copyright (c) Juniper Networks, Inc., 2023. All rights reserved.
 # 
 # Notice and Disclaimer: This code is licensed to you under the MIT License (the
 # "License"). You may not use this code except in compliance with the License.
@@ -31,8 +31,11 @@
 
 from argparse import ArgumentParser, FileType
 from os import getenv
-
 from jinja2 import Template
+
+from config import Meshrrconfig
+
+mconf=Meshrrconfig()
 
 if __name__ == "__main__":
 
@@ -47,27 +50,22 @@ if __name__ == "__main__":
     template = Template(args.inputfile.read())
 
     configvars = dict()
-    configvars.update({"ENCRYPTED_ROOT_PW": getenv("ENCRYPTED_ROOT_PW", None)})
-    if not configvars["ENCRYPTED_ROOT_PW"]:
-        raise (Exception("ENCRYPTED_ROOT_PW is not set."))
-    configvars.update({"AUTONOMOUS_SYSTEM": getenv("AUTONOMOUS_SYSTEM", None)})
-    if not configvars["AUTONOMOUS_SYSTEM"]:
-        raise (Exception("AUTONOMOUS_SYSTEM is not set."))
+
+    # Populate variables to be used in templates that must come from env
+    configvars.update({"LICENSE_KEY": getenv("LICENSE_KEY", None)})
+    if not configvars["LICENSE_KEY"]:
+        raise (Exception("LICENSE_KEY is not set."))
     configvars.update({"POD_IP": getenv("POD_IP", None)})
     if not configvars["POD_IP"]:
         raise (Exception("POD_IP is not set."))
-    configvars.update({"MESHRR_CLIENTRANGE": getenv("MESHRR_CLIENTRANGE", None)})
-    if not configvars["MESHRR_CLIENTRANGE"]:
-        raise (Exception("MESHRR_CLIENTRANGE is not set."))
-    configvars.update({"UPSTREAM_SERVICE_NAME": getenv("UPSTREAM_SERVICE_NAME", None)})
 
-    # Default to Route Reflector Mode
-    configvars.update({"MESHRR_MODE": getenv("MESHRR_MODE", "routereflector")})
-    # Default AS Range for Route Server mode is 65001 to 65000
-    configvars.update({"MESHRR_ASRANGE": getenv("MESHRR_ASRANGE", "65001-65500")})
-    # Default to inet unicast only
-    configvars.update({"MESHRR_FAMILY_INET": getenv("MESHRR_FAMILY_INET", "true")})
-    configvars.update({"MESHRR_FAMILY_EVPN": getenv("MESHRR_FAMILY_EVPN", "false")})
+    # Populate variables to be used in termplates that will come from Meshrrconfig / YAML
+    configvars.update({
+        "encrypted_root_pw": mconf.encrypted_root_pw,
+        "asn": mconf.asn,
+        "bgpgroups_mesh": mconf.get_bgpgroups_dict('mesh'),
+        "bgpgroups_subtractive": mconf.get_bgpgroups_dict('subtractive')
+        })
 
     crpd_config = template.render(configvars)
     args.outputfile.write(crpd_config)

@@ -1,0 +1,25 @@
+---
+kind: "Service"
+apiVersion: "v1"
+metadata:
+  name: "meshrr-partialtable-clients"
+spec:
+  clusterIP: None
+  ports:
+    - name: "bgp"
+      protocol: "TCP"
+      port: 179
+      targetPort: 179
+---
+kind: "Endpoints"
+apiVersion: "v1"
+metadata:
+  name: "meshrr-partialtable-clients" 
+subsets: 
+  - addresses:
+      - ip: "2.3.4.5"
+      - ip: "6.7.8.9"
+    ports:
+      -
+        port: 179
+        name: "bgp"

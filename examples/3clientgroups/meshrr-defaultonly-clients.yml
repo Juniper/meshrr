@@ -1,0 +1,26 @@
+---
+kind: "Service"
+apiVersion: "v1"
+metadata:
+  name: "meshrr-defaultonly-clients"
+spec:
+  clusterIP: None
+  ports:
+    - name: "bgp"
+      protocol: "TCP"
+      port: 179
+      targetPort: 179
+---
+kind: "Endpoints"
+apiVersion: "v1"
+metadata:
+  name: "meshrr-defaultonly-clients" 
+subsets: 
+  - addresses:
+      - ip: "192.0.2.4"
+      - ip: "192.0.2.5"
+      - ip: "192.0.2.56"
+    ports:
+      -
+        port: 179
+        name: "bgp"

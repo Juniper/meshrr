@@ -1,4 +1,4 @@
-# Copyright (c) Juniper Networks, Inc., 2020. All rights reserved.
+# Copyright (c) Juniper Networks, Inc., 2023. All rights reserved.
 # 
 # Notice and Disclaimer: This code is licensed to you under the MIT License (the
 # "License"). You may not use this code except in compliance with the License.
@@ -27,32 +27,30 @@
 # components is subject to the terms and conditions of the respective license as
 # noted in the Third-Party source code file.
 
-FROM crpd:22.4R1.10 as prebuild
+FROM alpine:3.18 as meshrr-prebuild
 
-WORKDIR /root
+WORKDIR /opt/meshrr
 
-COPY requirements.txt /root/
+COPY requirements.txt /opt/meshrr/
 
-# This blocks cron startup if not changed
-RUN printf '#!/bin/sh\nexit 0\n' > /usr/sbin/policy-rc.d
-
-# Install requirements. Note that cron must be reconfigured later to create user.
-RUN apt-get update \
-    && apt-get -y --no-install-recommends install cron python3-minimal python3-setuptools python3-pip \
-    && rm -fr /var/lib/apt/lists/* \
-    && pip3 install wheel \
+RUN apk add --update --no-cache python3 py3-pip openssh \
     && pip3 install -r requirements.txt
 
-FROM prebuild
+FROM meshrr-prebuild
 
-COPY render_config.py /root/
-COPY runit-init.sh /sbin/
-COPY juniper.conf.j2 /root/
-COPY update_peers.py /root/
+RUN mkdir -p /config /secret/ssh conf
 
-RUN chmod +x /sbin/runit-init.sh
-RUN chmod +x /root/update_peers.py
-RUN chmod +x /root/render_config.py
+COPY config.py /opt/meshrr/
+COPY render_config.py /opt/meshrr/
+COPY run.sh /opt/meshrr/
+COPY defaults/ /opt/meshrr/defaults/
+COPY update_peers.py /opt/meshrr/
+COPY connect_wait.py /opt/meshrr/
+COPY ../LICENSE /opt/meshrr/
 
-ENTRYPOINT [ "/sbin/runit-init.sh" ]
-STOPSIGNAL 35
+RUN chmod +x /opt/meshrr/run.sh
+RUN chmod +x /opt/meshrr/connect_wait.py
+RUN chmod +x /opt/meshrr/update_peers.py
+RUN chmod +x /opt/meshrr/render_config.py
+
+ENTRYPOINT [ "/opt/meshrr/run.sh" ]

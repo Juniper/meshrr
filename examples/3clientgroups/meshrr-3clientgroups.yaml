@@ -1,8 +1,122 @@
 ---
 apiVersion: v1
+data:
+  config: |
+    system {
+        /* Required, though use of a variable is optional */
+        root-authentication {
+            encrypted-password "{{ encrypted_root_pw }}"; ## SECRET-DATA
+        }
+        login {
+            /* Required for meshrr authentication */
+            user meshrr {
+                class super-user;
+                uid 100;
+                authentication {
+                    ssh-ed25519 "ssh-ed25519 TBD"; ## SECRET-DATA
+                }
+            }
+        }
+        services {
+            netconf {
+                ssh;
+            }
+        }
+        /* Required for licensing unless using an alternative approach. */
+        license {
+            keys {
+                key "{{ LICENSE_KEY }}";
+            }
+        }
+        processes {
+            routing {
+                bgp {
+                    rib-sharding;
+                    update-threading;
+                }
+            }
+        }
+    }
+    groups {
+        MESHRR {
+            protocols {
+                bgp {
+                    /* Mesh {% if bgpgroups_mesh['MESHRR-MESH'].max_peers is defined %}max_peers:{{ bgpgroups_mesh['MESHRR-MESH'].max_peers }} {% endif %}group from {{ bgpgroups_mesh['MESHRR-MESH'].source.sourcetype }}:{{ bgpgroups_mesh['MESHRR-MESH'].source.hostname }} */
+                    group MESHRR-MESH {
+                        type internal
+                    }
+                    /* Mesh {% if bgpgroups_mesh['MESHRR-FULLTABLE-CLIENTS'].max_peers is defined %}max_peers:{{ bgpgroups_mesh['MESHRR-FULLTABLE-CLIENTS'].max_peers }} {% endif %}group from {{ bgpgroups_mesh['MESHRR-FULLTABLE-CLIENTS'].source.sourcetype }}:{{ bgpgroups_mesh['MESHRR-FULLTABLE-CLIENTS'].source.hostname }} */
+                    group MESHRR-FULLTABLE-CLIENTS {
+                        type internal;
+                        passive;
+                        cluster {{ POD_IP }};
+                    }
+                    /* Mesh {% if bgpgroups_mesh['MESHRR-PARTIALTABLE-CLIENTS'].max_peers is defined %}max_peers:{{ bgpgroups_mesh['MESHRR-PARTIALTABLE-CLIENTS'].max_peers }} {% endif %}group from {{ bgpgroups_mesh['MESHRR-PARTIALTABLE-CLIENTS'].source.sourcetype }}:{{ bgpgroups_mesh['MESHRR-PARTIALTABLE-CLIENTS'].source.hostname }} */
+                    group MESHRR-PARTIALTABLE-CLIENTS {
+                        type internal;
+                        passive;
+                        export PARTIALTABLE-OUT;
+                        cluster {{ POD_IP }};
+                    }
+                    /* Mesh {% if bgpgroups_mesh['MESHRR-DEFAULTONLY-CLIENTS'].max_peers is defined %}max_peers:{{ bgpgroups_mesh['MESHRR-DEFAULTONLY-CLIENTS'].max_peers }} {% endif %}group from {{ bgpgroups_mesh['MESHRR-DEFAULTONLY-CLIENTS'].source.sourcetype }}:{{ bgpgroups_mesh['MESHRR-DEFAULTONLY-CLIENTS'].source.hostname }} */
+                    group MESHRR-DEFAULTONLY-CLIENTS {
+                        type internal;
+                        passive;
+                        export DEFAULTONLY-OUT;
+                        cluster {{ POD_IP }};
+                    }
+                }
+            }
+        }
+    }
+    policy-options {
+        policy-statement DEFAULTONLY-OUT {
+            from {
+                route-filter 0.0.0.0/0 exact;
+            }
+            then accept;
+        }
+        policy-statement PARTIALTABLE-OUT {
+            term SAME-AS {
+                from {
+                    as-path-calc-length 0 orlower;
+                }
+                then accept;
+            }
+            term DEFAULT {
+                from {
+                    route-filter 0.0.0.0/0 exact;
+                }
+                then accept;
+            }
+        }
+    }
+    routing-options {
+        autonomous-system {{ asn }};
+        router-id {{ POD_IP }};
+    }
+    protocols {
+        bgp {
+            apply-groups MESHRR;
+            family inet {
+                unicast {
+                    nexthop-resolution {
+                        no-resolution;
+                    }
+                    no-install;
+                }
+            }
+        }
+    }
 kind: ConfigMap
 metadata:
-  name: meshrr-mirkwood-conf
+  creationTimestamp: null
+  name: 3clientgroups-config
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: meshrr-3clientgroups-conf
 data:
   meshrr.conf.yml: |+
     encrypted_root_pw: NOLOGIN
@@ -13,46 +127,50 @@ data:
       type: mesh
       source:
         sourcetype: dns
-        hostname: meshrr-mirkwood
-    - name: MESHRR-CLIENTS
-      type: subtractive
-      prefixes:
-      - 0.0.0.0/0
-    - name: MESHRR-UPSTREAM
+        hostname: meshrr-3clientgroups
+    - name: MESHRR-FULLTABLE-CLIENTS
       type: mesh
       source:
         sourcetype: dns
-        hostname: meshrr-core
-      max_peers: 2
+        hostname: meshrr-fulltable-clients
+    - name: MESHRR-PARTIALTABLE-CLIENTS
+      type: mesh
+      source:
+        sourcetype: dns
+        hostname: meshrr-partialtable-clients
+    - name: MESHRR-DEFAULTONLY-CLIENTS
+      type: mesh
+      source:
+        sourcetype: dns
+        hostname: meshrr-defaultonly-clients
 ---
 apiVersion: metallb.io/v1beta1
 kind: IPAddressPool
 metadata:
-  name: meshrr-mirkwood
+  name: meshrr-3clientgroups
   namespace: metallb
 spec:
   addresses:
-  - 172.19.2.1/32
-  - 172.19.2.2/32
+  - 172.19.1.1/32
+  - 172.19.1.2/32
   autoAssign: false
 ---
 apiVersion: metallb.io/v1beta1
 kind: BGPAdvertisement
 metadata:
-  name: meshrr-mirkwood
+  name: meshrr-3clientgroups
   namespace: metallb
 spec:
   ipAddressPools:
-  - meshrr-mirkwood
+  - meshrr-3clientgroups
 ---
 apiVersion: v1
 kind: Service
 metadata:
   creationTimestamp: null
-  name: meshrr-mirkwood-a
-  selfLink: /api/v1/namespaces/default/services/meshrr-mirkwood-a
+  name: meshrr-3clientgroups-a
   annotations:
-    metallb.universe.tf/address-pool: meshrr-mirkwood
+    metallb.universe.tf/address-pool: meshrr-3clientgroups
 spec:
   ports:
   - name: bgp
@@ -61,11 +179,10 @@ spec:
     targetPort: bgp
   selector:
     app: meshrr
-    meshrr_region_mirkwood: "true"
     redundancy_group: a
   sessionAffinity: None
   type: LoadBalancer
-  loadBalancerIP: 172.19.2.1
+  loadBalancerIP: 172.19.1.1
   externalTrafficPolicy: Local
 status:
   loadBalancer: {}
@@ -74,10 +191,9 @@ apiVersion: v1
 kind: Service
 metadata:
   creationTimestamp: null
-  name: meshrr-mirkwood-b
-  selfLink: /api/v1/namespaces/default/services/meshrr-mirkwood-b
+  name: meshrr-3clientgroups-b
   annotations:
-    metallb.universe.tf/address-pool: meshrr-mirkwood
+    metallb.universe.tf/address-pool: meshrr-3clientgroups
 spec:
   ports:
   - name: bgp
@@ -86,11 +202,10 @@ spec:
     targetPort: bgp
   selector:
     app: meshrr
-    meshrr_region_mirkwood: "true"
     redundancy_group: b
   sessionAffinity: None
   type: LoadBalancer
-  loadBalancerIP: 172.19.2.2
+  loadBalancerIP: 172.19.1.2
   externalTrafficPolicy: Local
 status:
   loadBalancer: {}
@@ -99,8 +214,7 @@ apiVersion: v1
 kind: Service
 metadata:
   creationTimestamp: null
-  name: meshrr-mirkwood
-  selfLink: /api/v1/namespaces/default/services/meshrr-mirkwood
+  name: meshrr-3clientgroups
 spec:
   clusterIP: None
   ports:
@@ -110,20 +224,17 @@ spec:
     targetPort: bgp
   selector:
     app: meshrr
-    meshrr_region_mirkwood: "true"
   sessionAffinity: None
   type: ClusterIP
 status:
   loadBalancer: {}
-
 ---
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: meshrr-mirkwood-a
+  name: meshrr-3clientgroups-a
   labels:
     app: meshrr
-    meshrr_region_mirkwood: "true"
     redundancy_group: a
 spec:
   selector:
@@ -138,7 +249,6 @@ spec:
     metadata:
       labels:
         app: meshrr
-        meshrr_region_mirkwood: "true"
         redundancy_group: a
     spec:
       dnsPolicy: ClusterFirst
@@ -155,7 +265,7 @@ spec:
             - key: meshrr.conf.yml
               mode: 256
               path: meshrr.conf.yml
-            name: meshrr-mirkwood-conf
+            name: meshrr-3clientgroups-conf
             optional: false
         - configMap:
             defaultMode: 256
@@ -163,7 +273,7 @@ spec:
             - key: config
               mode: 256
               path: juniper.conf.j2
-            name: mirkwood-config
+            name: 3clientgroups-config
             optional: false
           name: override-config
       initContainers:
@@ -259,19 +369,14 @@ spec:
                     operator: In
                     values:
                       - a
-                  - key: meshrr_region_mirkwood
-                    operator: In
-                    values:
-                      - "true"
 
 ---
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: meshrr-mirkwood-b
+  name: meshrr-3clientgroups-b
   labels:
     app: meshrr
-    meshrr_region_mirkwood: "true"
     redundancy_group: b
 spec:
   selector:
@@ -286,7 +391,6 @@ spec:
     metadata:
       labels:
         app: meshrr
-        meshrr_region_mirkwood: "true"
         redundancy_group: b
     spec:
       dnsPolicy: ClusterFirst
@@ -303,7 +407,7 @@ spec:
             - key: meshrr.conf.yml
               mode: 256
               path: meshrr.conf.yml
-            name: meshrr-mirkwood-conf
+            name: meshrr-3clientgroups-conf
             optional: false
         - configMap:
             defaultMode: 256
@@ -311,7 +415,7 @@ spec:
             - key: config
               mode: 256
               path: juniper.conf.j2
-            name: mirkwood-config
+            name: 3clientgroups-config
             optional: false
           name: override-config
       initContainers:
@@ -407,7 +511,3 @@ spec:
                     operator: In
                     values:
                       - b
-                  - key: meshrr_region_mirkwood
-                    operator: In
-                    values:
-                      - "true"

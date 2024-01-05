@@ -1,0 +1,76 @@
+system {
+    /* Required, though use of a variable is optional */
+    root-authentication {
+        encrypted-password "{{ encrypted_root_pw }}"; ## SECRET-DATA
+    }
+    login {
+        /* Required for meshrr authentication */
+        user meshrr {
+            class super-user;
+            uid 100;
+            authentication {
+                ssh-ed25519 "ssh-ed25519 TBD"; ## SECRET-DATA
+            }
+        }
+    }
+    /* Required for configuration persistence */
+    no-compress-configuration-files;
+    services {
+        netconf {
+            /* Required for meshrr access */
+            ssh;
+        }
+    }
+    /* Required for licensing unless using an alternative approach. */
+    license {
+        keys {
+            key "{{ LICENSE_KEY }}";
+        }
+    }
+    processes {
+        routing {
+            bgp {
+                rib-sharding;
+                update-threading;
+            }
+        }
+    }
+}
+routing-options {
+    autonomous-system {{ asn }};
+    router-id {{ POD_IP }};
+}
+groups {
+    MESHRR {
+        protocols {
+            bgp {
+                family inet {
+                    unicast {
+                        nexthop-resolution {
+                            no-resolution;
+                        }
+                        no-install;
+                    }
+                }
+                {%- for bgpgroup in bgpgroups_mesh %}
+                /* Mesh {% if bgpgroups_mesh[bgpgroup].max_peers is defined %}max_peers:{{ bgpgroups_mesh[bgpgroup].max_peers }} {% endif %}group from {{ bgpgroups_mesh[bgpgroup].source.sourcetype }}:{{ bgpgroups_mesh[bgpgroup].source.hostname }} */
+                group {{ bgpgroup }} {
+                    type internal
+                    family inet {
+                        unicast;
+                    }
+                }
+                {%- endfor %}
+                {%- for bgpgroup in bgpgroups_subtractive %}
+                /* Subtractive group from {{ bgpgroups_subtractive[bgpgroup].prefixes }} */
+                group {{ bgpgroup }} {
+                    type internal;
+                    cluster {{ POD_IP }};
+                    allow [ {% for prefix in bgpgroups_subtractive[bgpgroup].prefixes %}{{ prefix }} {% endfor %}];
+                }
+                {%- endfor %}
+            }
+        }
+    }
+}
+apply-groups MESHRR;

@@ -1,15 +1,15 @@
-﻿---
+---
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: meshrr-core-conf
+  name: meshrr-conf
 data:
   meshrr.conf.yml: |+
     encrypted_root_pw: NOLOGIN
-    asn: "65000"
-    mode: ipv4rr
+    asn: "65000.1"
+    mode: evpnrs
     bgpgroups:
-    - name: MESHRR-MESH
+    - name: MESHRR-CORE
       type: mesh
       source:
         sourcetype: dns
@@ -17,56 +17,114 @@ data:
     - name: MESHRR-CLIENTS
       type: subtractive
       prefixes:
-      - 10.42.0.0/16
-
+      - 192.168.0.0/16
+      asranges:
+      - 65001-65535
 ---
-apiVersion: v1
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: routeserver-a
+  namespace: metallb
+spec:
+  addresses:
+  - 192.168.255.1/32
+  autoAssign: false
+---
+apiVersion: metallb.io/v1beta1
+kind: BGPAdvertisement
+metadata:
+  name: routeserver-a
+  namespace: metallb
+spec:
+  ipAddressPools:
+  - routeserver-a
+  communities:
+  - 65000:0
+---
+﻿apiVersion: v1
 kind: Service
 metadata:
-  creationTimestamp: null
-  name: meshrr-core
-  selfLink: /api/v1/namespaces/default/services/meshrr-core
+  name: routeserver-a
+  annotations:
+    metallb.universe.tf/address-pool: routeserver-a
 spec:
-  clusterIP: None
   ports:
   - name: bgp
     port: 179
     protocol: TCP
     targetPort: bgp
   selector:
-    app: meshrr
-    meshrr_region_core: "true"
-  sessionAffinity: None
-  type: ClusterIP
-status:
-  loadBalancer: {}
-
+    app: meshrr-evpnrs
+    side: a
+  type: LoadBalancer
+  externalTrafficPolicy: Local
+# ---
+# ﻿apiVersion: v1
+# kind: Service
+# metadata:
+#   name: routeserver-1-a-0-mgt
+#   annotations:
+#     metallb.universe.tf/address-pool: routeserver-mgt
+# spec:
+#   ports:
+#   - name: ssh
+#     port: 22
+#     protocol: TCP
+#     targetPort: ssh
+#   - name: netconf
+#     port: 830
+#     protocol: TCP
+#     targetPort: netconf
+#   selector:
+#     statefulset.kubernetes.io/pod-name: routeserver-1-a-0
+#   type: LoadBalancer
+#   loadBalancerIP: 192.168.18.3
+#   externalTrafficPolicy: Local
+# ---
+# ﻿apiVersion: v1
+# kind: Service
+# metadata:
+#   name: routeserver-1-a-1-mgt
+#   annotations:
+#     metallb.universe.tf/address-pool: routeserver-mgt
+# spec:
+#   ports:
+#   - name: ssh
+#     port: 22
+#     protocol: TCP
+#     targetPort: ssh
+#   - name: netconf
+#     port: 830
+#     protocol: TCP
+#     targetPort: netconf
+#   selector:
+#     statefulset.kubernetes.io/pod-name: routeserver-1-a-1
+#   type: LoadBalancer
+#   loadBalancerIP: 192.168.18.6
+#   externalTrafficPolicy: Local
 ---
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
-  name: meshrr-core
+  name: routeserver-a
   labels:
-    app: meshrr
-    meshrr_region_core: "true"
+    app: meshrr-evpnrs
+    side: a
 spec:
+  serviceName: routeserver
+  podManagementPolicy: "Parallel"
   selector:
     matchLabels:
-      app: meshrr
-  replicas: 3
-  strategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxUnavailable: 1
-      maxSurge: 1
+      app: meshrr-evpnrs
+      side: a
+  replicas: 2
   template:
     metadata:
       labels:
-        app: meshrr
-        meshrr_region_core: "true"
+        app: meshrr-evpnrs
+        side: a
     spec:
-      dnsPolicy: ClusterFirst
-      terminationGracePeriodSeconds: 30
       volumes:
         - name: config
           emptyDir: {}
@@ -79,7 +137,7 @@ spec:
             - key: meshrr.conf.yml
               mode: 256
               path: meshrr.conf.yml
-            name: meshrr-core-conf
+            name: meshrr-conf
             optional: false
       initContainers:
         - name: meshrr-init
@@ -105,22 +163,24 @@ spec:
                 secretKeyRef:
                   name: crpd-license
                   key: crpd-license
+            - name: MESHRR_MODE
+              value: evpnrs
       containers:
         - name: crpd
           image: localhost/juniper/crpd:23.2R1.13
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Never
           livenessProbe:
             failureThreshold: 3
-            initialDelaySeconds: 15
-            periodSeconds: 2
+            initialDelaySeconds: 60
+            periodSeconds: 5
             successThreshold: 1
             tcpSocket:
               port: bgp
             timeoutSeconds: 3
           readinessProbe:
-            failureThreshold: 3
-            initialDelaySeconds: 5
-            periodSeconds: 2
+            failureThreshold: 5
+            initialDelaySeconds: 30
+            periodSeconds: 5
             successThreshold: 2
             tcpSocket:
               port: bgp
@@ -130,6 +190,12 @@ spec:
           ports:
             - name: bgp
               containerPort: 179
+              protocol: TCP
+            - name: ssh
+              containerPort: 22
+              protocol: TCP
+            - name: netconf
+              containerPort: 830
               protocol: TCP
           volumeMounts:
             - name: config
@@ -166,34 +232,16 @@ spec:
           requiredDuringSchedulingIgnoredDuringExecution:
             nodeSelectorTerms:
               - matchExpressions:
-                  - key: meshrr_region_core
+                  - key: side
                     operator: In
                     values:
-                      - "true"
+                      - "a"
         podAntiAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
             - labelSelector:
                 matchExpressions:
-                  - key: meshrr_region_core
-                    operator: In
-                    values:
-                      - 'true'
                   - key: app
                     operator: In
                     values:
-                      - meshrr
+                      - meshrr-evpnrs
               topologyKey: kubernetes.io/hostname
-          preferredDuringSchedulingIgnoredDuringExecution:
-            - weight: 50
-              podAffinityTerm:
-                labelSelector:
-                  matchExpressions:
-                    - key: app
-                      operator: In
-                      values:
-                        - meshrr
-                    - key: meshrr_region_core
-                      operator: In
-                      values:
-                        - 'true'
-                topologyKey: redundancy_group

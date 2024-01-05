@@ -1,6 +1,25 @@
 system {
     root-authentication {
-        encrypted-password "{{ ENCRYPTED_ROOT_PW }}"; ## SECRET-DATA
+        encrypted-password "{{ encrypted_root_pw }}"; ## SECRET-DATA
+    }
+    login {
+        user meshrr {
+            class super-user;
+            uid 100;
+            authentication {
+                ssh-ed25519 "ssh-ed25519 TBD"; ## SECRET-DATA
+            }
+        }
+    }
+    services {
+        netconf {
+            ssh;
+        }
+    }
+    license {
+        keys {
+            key "{{ LICENSE_KEY }}";
+        }
     }
     processes {
         routing {
@@ -21,12 +40,12 @@ groups {
                 group MESHRR-CLIENTS {
                     type internal;
                     cluster {{ POD_IP }};
-                    allow {{ MESHRR_CLIENTRANGE }};
-                }{% if UPSTREAM_SERVICE_NAME is not none %}
+                    allow [ {% for prefix in bgpgroups_subtractive['MESHRR-CLIENTS'].prefixes %}{{ prefix }} {% endfor %}];
+                }
                 group MESHRR-UPSTREAM {
                     type internal;
                     export UPSTREAM-OUT;
-                }{% endif %}
+                }
             }
         }
     }
@@ -49,7 +68,7 @@ policy-options {
     community INREGION-PREFERRED members 65000:102;
 }
 routing-options {
-    autonomous-system {{ AUTONOMOUS_SYSTEM }};
+    autonomous-system {{ asn }};
     router-id {{ POD_IP }};
 }
 protocols {

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright (c) Juniper Networks, Inc., 2020. All rights reserved.
+# Copyright (c) Juniper Networks, Inc., 2023. All rights reserved.
 #
 # Notice and Disclaimer: This code is licensed to you under the MIT License (the
 # "License"). You may not use this code except in compliance with the License.
@@ -32,28 +32,34 @@
 from os import getenv
 from random import randrange
 
+from datetime import datetime
 from dns import resolver
-from dotenv import load_dotenv
 from jnpr.junos import Device
 from jnpr.junos.utils.config import Config
-from netaddr import IPNetwork, IPAddress, IPSet, cidr_exclude, cidr_merge
+from netaddr import IPSet
 
-load_dotenv(dotenv_path="/etc/envvars")
+from config import Meshrrconfig
 
+mconf=Meshrrconfig()
+
+# Load necessary environment variables
+pod_ip = getenv("POD_IP")
+if not pod_ip:
+    raise (Exception("POD_IP environment variable not set"))
 
 class ConfigUpdate(Config):
     # Child class to maintain lists of selected peers in managed groups
 
-    def __init__(self, dev, mode=None, **kwargs):
+    def __init__(self, device, mode=None, **kwargs):
         self.__selected_peers = dict()
-        super().__init__(dev, mode, **kwargs)
+        super().__init__(device, mode, **kwargs)
 
     def initiate_group(self, group_name, force=False):
         """Initiate the group from live configuration only if it's not inventoried yet. Override with force=True"""
         if group_name not in self.__selected_peers or force:
             # Get the list of neighbors in the group
-            filter = f"<configuration><groups><name>MESHRR</name><protocols><bgp><group><name>{group_name}</name><neighbor><name/></neighbor></group></bgp></protocols></groups></configuration>"
-            data = dev.rpc.get_config(filter_xml=filter)
+            xmlfilter = f"<configuration><groups><name>MESHRR</name><protocols><bgp><group><name>{group_name}</name><neighbor><name/></neighbor></group></bgp></protocols></groups></configuration>"
+            data = dev.rpc.get_config(filter_xml=xmlfilter)
             configured_peers = data.xpath(
                 f"groups/protocols/bgp/group[name='{group_name}']/neighbor/name/text()"
             )
@@ -62,7 +68,7 @@ class ConfigUpdate(Config):
         else:
             return False
 
-    def get_allowed_peers(self, allowed_base=getenv("MESHRR_CLIENTRANGE")):
+    def get_allowed_peers(self, bgpgroup):
         """
         Returns the allowed_base minus any explicitly configured managed peers
         This is required, otherwise configured peers may end up in the wrong group.
@@ -70,28 +76,70 @@ class ConfigUpdate(Config):
         """
 
         disallowed = IPSet(cu.get_all_selected_peers())
-        allowed = [IPNetwork(allowed_base)]
-        for disallowed_ip in disallowed:
-            for network in allowed:
-                if disallowed_ip in network:
-                    allowed.remove(network)
-                    allowed.extend(cidr_exclude(network, disallowed_ip))
-                    break
-        allowed = cidr_merge(allowed)
+        allowed = IPSet(bgpgroup['prefixes'])
+        allowed = allowed-disallowed
         return allowed
 
-    def commit_peerupdate(self, **kwargs):
-        allowed = self.get_allowed_peers()
-        allowed_string = " ".join([str(network) for network in allowed])
+    def update_bgpgroup_mesh(self, bgpgroup):
+        detected_peers = list()
+
+        # Get peers for DNS based BGP group [DEFAULT]
+        if 'sourcetype' not in bgpgroup['source'] or bgpgroup['source']['sourcetype'].casefold() == 'dns':
+            try:
+                result = resolver.resolve(
+                    bgpgroup['source']['hostname'], "A", search=True
+                )
+            except (resolver.NXDOMAIN, resolver.NoAnswer) as err:
+                print(f"[{datetime.now()}]", err.msg, f"Skipping processing of {bgpgroup['name']}.")
+                return
+
+            for r in result:
+                if r.address != pod_ip:
+                    detected_peers.append(r.address)
+        else:
+            raise(Exception(f"Invalid source type for group {bgpgroup['name']}: {bgpgroup['source']['sourcetype']}"))
+
+        # Identify peers that should be active after this commit.
+        # Currently configured peers that are still detected via DNS are prioritized.
+        # Additional peers will be selected at random from detected_peers until `max_peers` are selected.
+        configured_peers = self.get_selected_peers(bgpgroup['name'])
+        selected_peers = list()
+        for peer_ip in configured_peers:
+            if 'max_peers' not in bgpgroup or len(selected_peers) < bgpgroup['max_peers']:
+                if peer_ip in detected_peers:
+                    selected_peers.append(peer_ip)
+                    detected_peers.remove(peer_ip)
+            else:
+                # The peer group is full with selected_peers. No need to continue this loop.
+                break
+        while len(detected_peers) and (
+            'max_peers' not in bgpgroup or len(selected_peers) < bgpgroup['max_peers']
+        ):
+            # Add a peer at random from those detected to fill to max_peers.
+            selected_peers.append(detected_peers.pop(randrange(len(detected_peers))))
+
+        # Compare detected_peers (up-to-date list) with configured_peers.
+        # Add detected_peers not in configured_peers.
+        # Remove configured_peers not in detected_peers.
+        peers_to_add = set(selected_peers) - set(configured_peers)
+        for peer_ip in peers_to_add:
+            self.add_selected_peer(bgpgroup['name'], peer_ip)
+
+        peers_to_remove = set(configured_peers) - set(selected_peers)
+        for peer_ip in peers_to_remove:
+            self.remove_selected_peer(bgpgroup['name'], peer_ip)
+
+    def update_bgpgroup_subtractive(self, bgpgroup):
+        allowed = self.get_allowed_peers(bgpgroup)
+        allowed_string = " ".join([str(network) for network in allowed.iter_cidrs()])
         self.load(
-            f"delete groups MESHRR protocols bgp group MESHRR-CLIENTS allow",
+            f"delete groups MESHRR protocols bgp group {bgpgroup['name']} allow",
             format="set",
         )
         self.load(
-            f"set groups MESHRR protocols bgp group MESHRR-CLIENTS allow [ {allowed_string} ]",
+            f"set groups MESHRR protocols bgp group {bgpgroup['name']} allow [ {allowed_string} ]",
             format="set",
         )
-        self.commit()
 
     def get_selected_peers(self, group_name):
         self.initiate_group(group_name)
@@ -99,8 +147,8 @@ class ConfigUpdate(Config):
 
     def get_all_selected_peers(self):
         result = list()
-        for group in self.__selected_peers:
-            result.extend(self.__selected_peers[group])
+        for groupname in self.__selected_peers:
+            result.extend(self.__selected_peers[groupname])
         return result
 
     def add_selected_peer(self, group_name, peer_ip):
@@ -120,101 +168,25 @@ class ConfigUpdate(Config):
         )
 
 
-def update_peergroup(cu, group_name, service_name, max_peers=None):
-    detected_peers = list()
-    try:
-        result = resolver.resolve(
-            f"{service_name}.{kube_namespace}.{service_root_domain}", "A"
-        )
-    except (resolver.NXDOMAIN, resolver.NoAnswer) as err:
-        print(err.msg, f"- Skipping processing of {group_name}.")
-        return cu
-
-    for r in result:
-        if r.address != pod_ip:
-            detected_peers.append(r.address)
-
-    # Identify peers that should be active after this commit.
-    # Currently configured peers that are still detected via DNS are prioritized.
-    # Additional peers will be selected at random from detected_peers until `max_peers` are selected.
-    configured_peers = cu.get_selected_peers(group_name)
-    selected_peers = list()
-    for peer_ip in configured_peers:
-        if max_peers is None or len(selected_peers) < max_peers:
-            if peer_ip in detected_peers:
-                selected_peers.append(peer_ip)
-                detected_peers.remove(peer_ip)
-        else:
-            # The peer group is full with selected_peers. No need to continue this loop.
-            break
-    while len(detected_peers) and (
-        max_peers is None or len(selected_peers) < max_peers
-    ):
-        selected_peers.append(detected_peers.pop(randrange(len(detected_peers))))
-
-    # Compare detected_peers (up-to-date list) with configured_peers.
-    # Add detected_peers not in configured_peers.
-    # Remove configured_peers not in detected_peers.
-    peers_to_add = set(selected_peers) - set(configured_peers)
-    for peer_ip in peers_to_add:
-        cu.add_selected_peer(group_name, peer_ip)
-
-    peers_to_remove = set(configured_peers) - set(selected_peers)
-    for peer_ip in peers_to_remove:
-        cu.remove_selected_peer(group_name, peer_ip)
-    return cu
-
-
 if __name__ == "__main__":
-    # Load necessary environment variables
-    pod_ip = getenv("POD_IP")
-    if not pod_ip:
-        raise (Exception("POD_IP environment variable not set"))
 
-    mesh_service_name = getenv("MESH_SERVICE_NAME")
-
-    upstream_service_name = getenv("UPSTREAM_SERVICE_NAME")
-
-    if not mesh_service_name and not upstream_service_name:
-        raise (
-            Exception(
-                "MESH_SERVICE_NAME and UPSTREAM_SERVICE_NAME environment variables not set"
-            )
-        )
-
-    kube_namespace = getenv("KUBE_NAMESPACE", "default")
-    service_root_domain = getenv("SERVICE_ROOT_DOMAIN", "svc.cluster.local")
+    # Confirm that a mesh BGP group has been defined.
+    if not mconf.bgpgroups_mesh:
+        raise(Exception("No mesh BGP groups defined."))
 
     # Open a connection to the device
-    dev = Device()
+    dev = Device(host="127.0.0.1",user="meshrr",ssh_private_key_file="/secret/ssh/id_ed25519")
     dev.open()
     with ConfigUpdate(dev, mode="private") as cu:
-
-        groups = list()
-        if mesh_service_name:
-            groups.append(
-                {
-                    "name": "MESHRR-MESH",
-                    "service_name": mesh_service_name,
-                    "max_peers": None,
-                }
+        for group in mconf.bgpgroups_mesh:
+            cu.update_bgpgroup_mesh(
+                bgpgroup=group
             )
-
-        if upstream_service_name:
-            groups.append(
-                {
-                    "name": "MESHRR-UPSTREAM",
-                    "service_name": upstream_service_name,
-                    "max_peers": 2,
-                }
-            )
-
-        for group in groups:
-            cu = update_peergroup(
-                cu,
-                group_name=group["name"],
-                service_name=group["service_name"],
-                max_peers=group["max_peers"],
+        for group in mconf.bgpgroups_subtractive:
+            cu.update_bgpgroup_subtractive(
+                bgpgroup=group
             )
         if cu.diff():
-            cu.commit_peerupdate()
+            print(f"[{datetime.now()}] Peer change detected. Writing changes:")
+            cu.pdiff()
+            cu.commit()

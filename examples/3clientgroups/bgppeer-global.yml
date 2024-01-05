@@ -4,7 +4,7 @@ metadata:
   name: global-lo1
   namespace: metallb
 spec:
-  myASN: 4259840003
-  peerASN: 4259840002
-  peerAddress: 192.168.255.0
+  myASN: 65001
+  peerASN: 65000
+  peerAddress: 10.0.0.0
   ebgpMultiHop: True
