@@ -278,7 +278,7 @@ spec:
           name: override-config
       initContainers:
         - name: meshrr-init
-          image: ghcr.io/juniper/meshrr:next
+          image: ghcr.io/juniper/meshrr:v0.2
           imagePullPolicy: IfNotPresent
           args: ["init"]
           volumeMounts:
@@ -338,7 +338,7 @@ spec:
             privileged: true
             runAsNonRoot: false
         - name: meshrr
-          image: ghcr.io/juniper/meshrr:next
+          image: ghcr.io/juniper/meshrr:v0.2
           imagePullPolicy: IfNotPresent
           args: ["sidecar"]
           startupProbe:
@@ -420,7 +420,7 @@ spec:
           name: override-config
       initContainers:
         - name: meshrr-init
-          image: ghcr.io/juniper/meshrr:next
+          image: ghcr.io/juniper/meshrr:v0.2
           imagePullPolicy: IfNotPresent
           args: ["init"]
           volumeMounts:
@@ -480,7 +480,7 @@ spec:
             privileged: true
             runAsNonRoot: false
         - name: meshrr
-          image: ghcr.io/juniper/meshrr:next
+          image: ghcr.io/juniper/meshrr:v0.2
           imagePullPolicy: IfNotPresent
           args: ["sidecar"]
           startupProbe:
