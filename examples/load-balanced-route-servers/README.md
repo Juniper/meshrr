@@ -1,4 +1,4 @@
-# Example: Fully-meshed Multi-region Route Servers
+# Example: Fully-meshed Route Servers
 
 ## Description
 * cRPD is used as route servers for EVPN connectivity to minimize peering requirements in a many-DC environment.
@@ -165,8 +165,8 @@
   - `Service/meshrr-core` - Provides a headless service coordinating the meshrr function of automatically forming full-mesh iBGP peerings between route servers. Also includes the IPAddressPool and corresponding L2Advertisement for the management network connectivity of the route servers. (In a lab environment, a single L2 domain for cRPD management was sufficient.)
 - `metallb-bgppeer-global.yml`
   - `bgppeers.metallb.io/asn100-global-lo100` - Peers MetalLB to the loopback deployed for on each router connecting to the Kubernetes cluster.
-- `routeserver-<region>-<side>.yml`
-  - `ipaddresspools.metallb.io/routeserver-<region>-<side>` - Creates a pool containing the single address for the service per region per side. `autoAssign: false` ensures that the address is not allocated unless specifically requested by the service.
-  - `bgpadvertisements.metallb.io/routeserver-<region>-<side>` - Advertises the address to all peers (by default) from all nodes that host and endpoint for the service.
-  - `Service/routeserver-<region>-<side>` - Allocates the address based on the pool defined previously and uses it as an external address load balancing BGP to all healthy pods matching the criteria.
-  - `Deployment/routeserver-<region>-<side>` - Creates a deployment of the service for the region and side. In the `routerserver-1-b` example, `replicas: 2`, but for most production deployments, 1 should be sufficient and operationally simpler.
+- `routeserver-<side>.ss.yml`
+  - `ipaddresspools.metallb.io/routeserver-<side>` - Creates a pool containing the single address for the service per side. `autoAssign: false` ensures that the address is not allocated unless specifically requested by the service.
+  - `bgpadvertisements.metallb.io/routeserver-<side>` - Advertises the address to all peers (by default) from all nodes that host and endpoint for the service.
+  - `Service/routeserver-<side>` - Allocates the address based on the pool defined previously and uses it as an external address load balancing BGP to all healthy pods matching the criteria.
+  - `StatefulSet/routeserver-<side>` - Creates a StatefulSet of the service for the side. In the `routerserver-b` example, `replicas: 2`, but for most production deployments, 1 should be sufficient and operationally simpler.
