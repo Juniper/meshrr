@@ -46,12 +46,12 @@ At this time and in the project's raw form, *meshrr* should not be considered fo
       kubectl create secret generic crpd-license --from-file=crpd-license=<filepath>
       ```
     Note that `<filepath>` must point to a file that contains the singular license line and not an entire license file.
-    4. (If required) Custom configuration Jinja2 templates loaded into ConfigMaps and mapped as volumes. See [Examples](#Examples).
-4.  (If required - e.g., for [2regions-hrr](examples/2regions-hrr/) where only certain nodes should host certain clusters of RRs) Apply appropriate labels to the nodes:
+4. (If required) Custom configuration Jinja2 templates loaded into ConfigMaps and mapped as volumes. See [Examples](#Examples).
+5.  (If required - e.g., for [2regions-hrr](examples/2regions-hrr/) where only certain nodes should host certain clusters of RRs) Apply appropriate labels to the nodes:
     ```bash
     kubectl label nodes <node> <label1>=<value> <label2>=<value>
     ```
-5.  Apply your configuration:
+6.  Apply your configuration:
     ```bash
     kubectl [-n namespace] apply -f <file1>
     kubectl [-n namespace] apply -f <file2>

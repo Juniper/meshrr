@@ -5,7 +5,7 @@
 ## Description
 * This topology has two regions, `mirkwood` and `lothlorian`, and a `core` region.
 * Within a region, all cRPDs are fully meshed via iBGP to provide maximum visibility within the region.
-* All cRPDs in a region other than `core` have BGP peerings with up to 2 `core` cRPDs. The `core` cRPDs serve as route reflectors for the non-core regions. (The limit of 2 is hard coded on upstream peer groups.)
+* All cRPDs in a region other than `core` have BGP peerings with up to 2 `core` cRPDs as dictated by the `max_peers` setting. The `core` cRPDs serve as route reflectors for the non-core regions.
 * **Redundancy groups and anycast addressing:**
   * Each node is assigned to redundancy group `a` or `b`. (In a production environment, two separate Kubernetes clusters may be desirable.)
   * For each region with neighbors outside the cluster, separate DaemonSets are created for `a` and `b`, each with a unique IP address for that [meshrr_region:redundancy_group] combination. This IP address is used for iBGP peering with neighbors outside the cluster.

@@ -45,7 +45,7 @@
               preferred;
             }
             # MetalLB Anycast Peer
-            address 192.168.255.0/32/32;
+            address 192.168.255.0/32;
           }
         }
       }
